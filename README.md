@@ -1,13 +1,13 @@
 ## Bootstrap
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/pa2x2/agents/v0.1.0/src/bootstrap.sh | sh
+curl -fsSL https://raw.githubusercontent.com/pa2x2/agents/master/src/bootstrap.sh | sh
 ```
 
 To install a particular release binary, select the matching tag:
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/pa2x2/agents/v0.1.0/src/bootstrap.sh | \
+curl -fsSL https://raw.githubusercontent.com/pa2x2/agents/master/src/bootstrap.sh | \
   PA2_SKILLS_VERSION=v0.1.0 sh
 ```
 
