@@ -287,6 +287,7 @@ func printUsage(writer io.Writer) {
 const zshCompletion = `#compdef pa2-skills
 
 _pa2_skills() {
+  local command
   local -a commands skills harnesses scopes conflicts
   commands=(
 	'install:install or refresh a skill'
@@ -304,7 +305,12 @@ _pa2_skills() {
   harnesses=(claude codex opencode)
   scopes=(user project)
   conflicts=(ask overwrite skip)
-  case $words[2] in
+  command=$words[2]
+  if (( CURRENT > 2 )); then
+    words=($words[1] "${words[3,-1]}")
+    (( CURRENT-- ))
+  fi
+  case $command in
     install|sync)
       _arguments -s \
         '--scope=[installation scope]:scope:->scope' \
