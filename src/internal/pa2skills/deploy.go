@@ -57,15 +57,15 @@ func (m Manager) SkillNames() ([]string, error) {
 }
 
 func (m Manager) Install(skill string, scope Scope, harnesses []string, policy ConflictPolicy) error {
+	if err := ValidateInstallArguments(skill, scope, harnesses, policy); err != nil {
+		return err
+	}
 	projectRoot, err := m.projectRoot(scope)
 	if err != nil {
 		return err
 	}
 	source, ref, err := m.skillSource(skill)
 	if err != nil {
-		return err
-	}
-	if err := validateHarnesses(harnesses); err != nil {
 		return err
 	}
 	activePolicy := policy
@@ -148,6 +148,9 @@ func (m Manager) Install(skill string, scope Scope, harnesses []string, policy C
 }
 
 func (m Manager) Sync(skill string, scope Scope, harnesses []string, policy ConflictPolicy) error {
+	if err := ValidateInstallArguments(skill, scope, harnesses, policy); err != nil {
+		return err
+	}
 	if err := m.refreshSource(); err != nil {
 		return err
 	}
@@ -391,9 +394,21 @@ func installationWithRef(installation Installation, ref string) Installation {
 	return installation
 }
 
-func validateHarnesses(harnesses []string) error {
+func ValidateInstallArguments(skill string, scope Scope, harnesses []string, policy ConflictPolicy) error {
+	var validationErrors []error
+	if skill == "" {
+		validationErrors = append(validationErrors, errors.New("skill name is required"))
+	} else if err := ValidateSkillName(skill); err != nil {
+		validationErrors = append(validationErrors, err)
+	}
+	if scope != ScopeUser && scope != ScopeProject {
+		validationErrors = append(validationErrors, errors.New("--scope must be user or project"))
+	}
+	if policy != ConflictAsk && policy != ConflictOverwrite && policy != ConflictSkip {
+		validationErrors = append(validationErrors, errors.New("--conflict must be ask, overwrite, or skip"))
+	}
 	if len(harnesses) == 0 {
-		return errors.New("at least one --harness value is required")
+		validationErrors = append(validationErrors, errors.New("at least one --harness value is required"))
 	}
 	seen := map[string]bool{}
 	for _, harness := range harnesses {
@@ -406,10 +421,10 @@ func validateHarnesses(harnesses []string) error {
 			valid = valid || harness == supported
 		}
 		if !valid {
-			return fmt.Errorf("unsupported harness %q (supported: %s)", harness, strings.Join(Harnesses, ", "))
+			validationErrors = append(validationErrors, fmt.Errorf("unsupported harness %q (supported: %s)", harness, strings.Join(Harnesses, ", ")))
 		}
 	}
-	return nil
+	return errors.Join(validationErrors...)
 }
 
 func showDiff(output io.Writer, current, source string) error {

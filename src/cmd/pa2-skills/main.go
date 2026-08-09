@@ -35,6 +35,9 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	manager := pa2skills.Manager{Paths: paths, Stdin: stdin, Stdout: stdout, Stderr: stderr}
 	switch arguments[0] {
 	case "version", "--version":
+		if err := requireNoArguments("version", arguments[1:]); err != nil {
+			return err
+		}
 		fmt.Fprintln(stdout, version)
 		return nil
 	case "install", "sync":
@@ -42,12 +45,18 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	case "update":
 		return updateInstallation(arguments[1:], manager, stdout, stderr)
 	case "list":
+		if err := requireNoArguments("list", arguments[1:]); err != nil {
+			return err
+		}
 		return listSkills(manager, stdout)
 	case "discover":
 		return discoverSkills(arguments[1:], manager, stdout)
 	case "add":
 		return addSkill(arguments[1:], manager, stdout)
 	case "source-path":
+		if err := requireNoArguments("source-path", arguments[1:]); err != nil {
+			return err
+		}
 		fmt.Fprintln(stdout, paths.SourceRoot)
 		return nil
 	case "cd":
@@ -55,8 +64,14 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	case "completion":
 		return completion(arguments[1:], manager, stdout)
 	case "doctor":
+		if err := requireNoArguments("doctor", arguments[1:]); err != nil {
+			return err
+		}
 		return doctor(manager, stdout)
 	case "help", "--help", "-h":
+		if err := requireNoArguments("help", arguments[1:]); err != nil {
+			return err
+		}
 		printUsage(stdout)
 		return nil
 	default:
@@ -90,18 +105,32 @@ func discoverSkills(arguments []string, manager pa2skills.Manager, stdout io.Wri
 }
 
 func addSkill(arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
-	if len(arguments) == 0 || strings.HasPrefix(arguments[0], "-") {
-		return errors.New("usage: pa2-skills add <skill-path> [--name <name>]")
+	source := ""
+	flagArguments := arguments
+	if len(arguments) > 0 && !strings.HasPrefix(arguments[0], "-") {
+		source = arguments[0]
+		flagArguments = arguments[1:]
 	}
-	source := arguments[0]
 	flags := flag.NewFlagSet("add", flag.ContinueOnError)
 	flags.SetOutput(stdout)
 	name := flags.String("name", "", "tracked skill name")
-	if err := flags.Parse(arguments[1:]); err != nil {
+	if err := flags.Parse(flagArguments); err != nil {
 		return err
 	}
+	var validationErrors []error
+	if source == "" {
+		validationErrors = append(validationErrors, errors.New("skill path is required"))
+	}
+	if *name != "" {
+		if err := pa2skills.ValidateSkillName(*name); err != nil {
+			validationErrors = append(validationErrors, err)
+		}
+	}
 	if flags.NArg() != 0 {
-		return errors.New("usage: pa2-skills add <skill-path> [--name <name>]")
+		validationErrors = append(validationErrors, fmt.Errorf("unexpected argument(s): %s", strings.Join(flags.Args(), ", ")))
+	}
+	if err := invalidArguments(validationErrors...); err != nil {
+		return err
 	}
 	target, err := manager.AddSkill(source, *name)
 	if err != nil {
@@ -112,29 +141,32 @@ func addSkill(arguments []string, manager pa2skills.Manager, stdout io.Writer) e
 }
 
 func installOrSync(command string, arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
-	if len(arguments) == 0 || strings.HasPrefix(arguments[0], "-") {
-		return fmt.Errorf("usage: pa2-skills %s <skill> --scope user|project --harness codex,claude", command)
+	skill := ""
+	flagArguments := arguments
+	if len(arguments) > 0 && !strings.HasPrefix(arguments[0], "-") {
+		skill = arguments[0]
+		flagArguments = arguments[1:]
 	}
-	skill := arguments[0]
 	flags := flag.NewFlagSet(command, flag.ContinueOnError)
 	flags.SetOutput(stdout)
 	scope := flags.String("scope", "", "user or project")
 	harnesses := flags.String("harness", "", "comma-separated harnesses")
 	conflict := flags.String("conflict", "ask", "ask, overwrite, or skip")
-	if err := flags.Parse(arguments[1:]); err != nil {
+	if err := flags.Parse(flagArguments); err != nil {
 		return err
 	}
+	var validationErrors []error
 	if flags.NArg() != 0 {
-		return fmt.Errorf("usage: pa2-skills %s <skill> --scope user|project --harness codex,claude", command)
-	}
-	if *scope != string(pa2skills.ScopeUser) && *scope != string(pa2skills.ScopeProject) {
-		return errors.New("--scope must be user or project")
+		validationErrors = append(validationErrors, fmt.Errorf("unexpected argument(s): %s", strings.Join(flags.Args(), ", ")))
 	}
 	policy := pa2skills.ConflictPolicy(*conflict)
-	if policy != pa2skills.ConflictAsk && policy != pa2skills.ConflictOverwrite && policy != pa2skills.ConflictSkip {
-		return errors.New("--conflict must be ask, overwrite, or skip")
-	}
 	selectedHarnesses := splitValues(*harnesses)
+	if err := pa2skills.ValidateInstallArguments(skill, pa2skills.Scope(*scope), selectedHarnesses, policy); err != nil {
+		validationErrors = append(validationErrors, err)
+	}
+	if err := invalidArguments(validationErrors...); err != nil {
+		return err
+	}
 	if command == "install" {
 		return manager.Install(skill, pa2skills.Scope(*scope), selectedHarnesses, policy)
 	}
@@ -151,18 +183,23 @@ func updateInstallation(arguments []string, manager pa2skills.Manager, stdout, s
 	if err := flags.Parse(arguments); err != nil {
 		return err
 	}
+	var validationErrors []error
 	if flags.NArg() != 0 {
-		return errors.New("usage: pa2-skills update [--check] [--binary-only|--skills-only] [--conflict ask|overwrite|skip]")
+		validationErrors = append(validationErrors, fmt.Errorf("unexpected argument(s): %s", strings.Join(flags.Args(), ", ")))
 	}
 	if *binOnly && *skillsOnly {
-		return errors.New("--binary-only and --skills-only cannot be used together")
+		validationErrors = append(validationErrors, errors.New("--binary-only and --skills-only cannot be used together"))
 	}
 	policy := pa2skills.ConflictPolicy(*conflict)
 	if policy != pa2skills.ConflictAsk && policy != pa2skills.ConflictOverwrite && policy != pa2skills.ConflictSkip {
-		return errors.New("--conflict must be ask, overwrite, or skip")
+		validationErrors = append(validationErrors, errors.New("--conflict must be ask, overwrite, or skip"))
+	}
+	if err := invalidArguments(validationErrors...); err != nil {
+		return err
 	}
 	if !*skillsOnly {
-		result, err := pa2skills.UpdateBinary(version, *check)
+		fmt.Fprintln(stdout, "Binary: checking for updates...")
+		result, err := pa2skills.UpdateBinary(version, *check, stdout)
 		if err != nil {
 			fmt.Fprintf(stderr, "Binary: check failed: %v\n", err)
 		} else {
@@ -173,6 +210,7 @@ func updateInstallation(arguments []string, manager pa2skills.Manager, stdout, s
 		return nil
 	}
 	if *check {
+		fmt.Fprintln(stdout, "Source: checking for updates...")
 		result, err := manager.CheckSource()
 		if err != nil {
 			return err
@@ -180,6 +218,7 @@ func updateInstallation(arguments []string, manager pa2skills.Manager, stdout, s
 		fmt.Fprintf(stdout, "Source: %s\n", result)
 		return nil
 	}
+	fmt.Fprintln(stdout, "Source: synchronizing checkout and installed skills...")
 	return manager.UpdateAll(policy)
 }
 
@@ -224,8 +263,17 @@ func changeDirectory(arguments []string, sourceRoot string, stdin io.Reader, std
 }
 
 func completion(arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
-	if len(arguments) != 1 {
-		return errors.New("usage: pa2-skills completion zsh|values")
+	var validationErrors []error
+	if len(arguments) == 0 {
+		validationErrors = append(validationErrors, errors.New("completion format is required (zsh or values)"))
+	} else if arguments[0] != "zsh" && arguments[0] != "values" {
+		validationErrors = append(validationErrors, fmt.Errorf("unsupported completion format %q (supported: zsh, values)", arguments[0]))
+	}
+	if len(arguments) > 1 {
+		validationErrors = append(validationErrors, fmt.Errorf("unexpected argument(s): %s", strings.Join(arguments[1:], ", ")))
+	}
+	if err := invalidArguments(validationErrors...); err != nil {
+		return err
 	}
 	switch arguments[0] {
 	case "zsh":
@@ -240,21 +288,38 @@ func completion(arguments []string, manager pa2skills.Manager, stdout io.Writer)
 			fmt.Fprintln(stdout, name)
 		}
 		return nil
-	default:
-		return errors.New("completion supports zsh or values")
 	}
+	return nil
 }
 
 func doctor(manager pa2skills.Manager, stdout io.Writer) error {
+	var validationErrors []error
 	if _, err := os.Stat(filepath.Join(manager.Paths.SourceRoot, ".git")); err != nil {
-		return fmt.Errorf("managed source checkout is unavailable at %s; run the bootstrap script", manager.Paths.SourceRoot)
+		validationErrors = append(validationErrors, fmt.Errorf("managed source checkout is unavailable at %s; run the bootstrap script", manager.Paths.SourceRoot))
 	}
 	if _, err := exec.LookPath("git"); err != nil {
-		return errors.New("git is required")
+		validationErrors = append(validationErrors, errors.New("git is required"))
+	}
+	if err := errors.Join(validationErrors...); err != nil {
+		return err
 	}
 	fmt.Fprintf(stdout, "Source checkout: %s\n", manager.Paths.SourceRoot)
 	fmt.Fprintf(stdout, "Private state: %s\n", manager.Paths.StateRoot())
 	return nil
+}
+
+func invalidArguments(validationErrors ...error) error {
+	if err := errors.Join(validationErrors...); err != nil {
+		return fmt.Errorf("invalid arguments:\n  - %s", strings.ReplaceAll(err.Error(), "\n", "\n  - "))
+	}
+	return nil
+}
+
+func requireNoArguments(command string, arguments []string) error {
+	if len(arguments) == 0 {
+		return nil
+	}
+	return invalidArguments(fmt.Errorf("%s does not accept arguments: %s", command, strings.Join(arguments, ", ")))
 }
 
 func splitValues(value string) []string {

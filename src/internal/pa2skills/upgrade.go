@@ -20,7 +20,10 @@ import (
 
 var defaultReleaseBaseURL string
 
-func UpdateBinary(currentVersion string, checkOnly bool) (string, error) {
+func UpdateBinary(currentVersion string, checkOnly bool, progress io.Writer) (string, error) {
+	if progress == nil {
+		progress = io.Discard
+	}
 	if currentVersion == "development" || currentVersion == "" {
 		return "development build; automatic upgrade skipped", nil
 	}
@@ -64,6 +67,7 @@ func UpdateBinary(currentVersion string, checkOnly bool) (string, error) {
 		return "", fmt.Errorf("automatic upgrade is unsupported on %s", runtime.GOARCH)
 	}
 	assetName := fmt.Sprintf("pa2-skills_%s_%s.tar.gz", runtime.GOOS, runtime.GOARCH)
+	fmt.Fprintf(progress, "Binary: downloading %s...\n", latest)
 	asset, err := download(client, fmt.Sprintf("%s/download/%s/%s", baseURL, latest, assetName))
 	if err != nil {
 		return "", err
@@ -72,6 +76,7 @@ func UpdateBinary(currentVersion string, checkOnly bool) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	fmt.Fprintln(progress, "Binary: verifying download...")
 	expected := checksumFor(checksums, assetName)
 	actualSum := sha256.Sum256(asset)
 	actual := hex.EncodeToString(actualSum[:])

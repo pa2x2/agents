@@ -63,7 +63,7 @@ func (m Manager) Discover(root string) ([]Discovery, error) {
 		if !skillInfo.Mode().IsRegular() {
 			finding.Status = "INVALID"
 			finding.Detail = "SKILL.md is not a regular file"
-		} else if err := validateSkillName(name); err != nil {
+		} else if err := ValidateSkillName(name); err != nil {
 			finding.Status = "INVALID"
 			finding.Detail = err.Error()
 		} else if declared, err := declaredSkillName(skillFile); err != nil {
@@ -129,7 +129,7 @@ func (m Manager) AddSkill(source, requestedName string) (string, error) {
 	if name == "" {
 		name = filepath.Base(resolvedSource)
 	}
-	if err := validateSkillName(name); err != nil {
+	if err := ValidateSkillName(name); err != nil {
 		return "", err
 	}
 	declared, err := declaredSkillName(skillFile)
@@ -181,7 +181,7 @@ func shouldSkipDiscoveryDirectory(name string) bool {
 	return strings.HasPrefix(name, ".") && !traversedHiddenDirectories[name]
 }
 
-func validateSkillName(name string) error {
+func ValidateSkillName(name string) error {
 	if name == "" || name == "." || name == ".." || filepath.Base(name) != name || strings.ContainsAny(name, `/\\`) {
 		return fmt.Errorf("invalid skill name %q", name)
 	}
