@@ -8,51 +8,6 @@ The managed source checkout is `~/.local/share/pa2-skills/agents` by default and
 
 Ensure `~/.local/bin` is on `PATH` if needed, then inspect the available skills:
 
-```sh
-pa2-skills list
-pa2-skills version
-```
-
-## Install a skill
-
-Choose the scope and supported harnesses explicitly.
-
-```sh
-pa2-skills install create-agent-workspace \
-  --scope user \
-  --harness codex,claude
-
-pa2-skills install create-agent-workspace \
-  --scope project \
-  --harness claude
-```
-
-| Harness | User target | Project target |
-|---|---|---|
-| Codex | `~/.agents/skills/<skill>` | `.agents/skills/<skill>` |
-| Claude Code | `~/.claude/skills/<skill>` | `.claude/skills/<skill>` |
-| OpenCode | `~/.config/opencode/skills/<skill>` | `.opencode/skills/<skill>` |
-
-## Sync a skill
-
-```sh
-pa2-skills sync create-agent-workspace \
-  --scope project \
-  --harness codex,claude
-```
-
-## Update pa2-skills
-
-Check for a newer verified release binary, fast-forward the managed source
-checkout, and synchronize every managed skill installation:
-
-```sh
-pa2-skills update
-```
-
-Use `pa2-skills update --check` to report binary and source updates without
-changing files. `--binary-only` and `--skills-only` limit the operation.
-
 ## Commands reference
 
 | Command | Purpose |
@@ -61,6 +16,8 @@ changing files. `--binary-only` and `--skills-only` limit the operation.
 | `pa2-skills sync <skill> --scope user\|project --harness <harnesses>` | Fetch the source repository and refresh one installed skill. |
 | `pa2-skills update` | Upgrade the binary and synchronize the source and all managed skill installations. |
 | `pa2-skills list` | List skills available from the managed source checkout. |
+| `pa2-skills discover [path]` | Report skills found below the current or supplied directory. |
+| `pa2-skills add <skill-path> [--name <name>]` | Copy a local skill into the managed source checkout without Git operations. |
 | `pa2-skills version` | Print the installed command version. |
 | `pa2-skills source-path` | Print the managed source checkout path. |
 | `pa2-skills cd [path]` | Launch a child shell in the managed source checkout or one of its paths. |

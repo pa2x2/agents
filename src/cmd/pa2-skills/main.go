@@ -43,6 +43,10 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		return updateInstallation(arguments[1:], manager, stdout, stderr)
 	case "list":
 		return listSkills(manager, stdout)
+	case "discover":
+		return discoverSkills(arguments[1:], manager, stdout)
+	case "add":
+		return addSkill(arguments[1:], manager, stdout)
 	case "source-path":
 		fmt.Fprintln(stdout, paths.SourceRoot)
 		return nil
@@ -58,6 +62,53 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	default:
 		return fmt.Errorf("unknown command %q", arguments[0])
 	}
+}
+
+func discoverSkills(arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
+	if len(arguments) > 1 {
+		return errors.New("usage: pa2-skills discover [path]")
+	}
+	root := "."
+	if len(arguments) == 1 {
+		root = arguments[0]
+	}
+	findings, err := manager.Discover(root)
+	if err != nil {
+		return err
+	}
+	for _, finding := range findings {
+		line := fmt.Sprintf("%-8s  %s  %s", finding.Status, finding.Path, finding.Name)
+		if finding.Detail != "" {
+			line += "  " + finding.Detail
+		}
+		fmt.Fprintln(stdout, line)
+	}
+	if len(findings) == 0 {
+		fmt.Fprintln(stdout, "No skills found.")
+	}
+	return nil
+}
+
+func addSkill(arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
+	if len(arguments) == 0 || strings.HasPrefix(arguments[0], "-") {
+		return errors.New("usage: pa2-skills add <skill-path> [--name <name>]")
+	}
+	source := arguments[0]
+	flags := flag.NewFlagSet("add", flag.ContinueOnError)
+	flags.SetOutput(stdout)
+	name := flags.String("name", "", "tracked skill name")
+	if err := flags.Parse(arguments[1:]); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return errors.New("usage: pa2-skills add <skill-path> [--name <name>]")
+	}
+	target, err := manager.AddSkill(source, *name)
+	if err != nil {
+		return err
+	}
+	fmt.Fprintf(stdout, "Added %s\nSource:  %s\nTracked: %s\n\nReview and publish manually:\n  pa2-skills cd\n  git status\n", filepath.Base(target), source, target)
+	return nil
 }
 
 func installOrSync(command string, arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
@@ -224,6 +275,8 @@ func printUsage(writer io.Writer) {
   pa2-skills sync <skill> --scope user|project --harness codex,claude [--conflict ask|overwrite|skip]
   pa2-skills update [--check] [--binary-only|--skills-only] [--conflict ask|overwrite|skip]
   pa2-skills list
+  pa2-skills discover [path]
+  pa2-skills add <skill-path> [--name <name>]
   pa2-skills source-path
   pa2-skills cd [path]
   pa2-skills completion zsh
@@ -241,6 +294,8 @@ _pa2_skills() {
 	'update:update the binary, source, and managed skills'
 	    'version:print the installed command version'
     'list:list available skills'
+    'discover:find skills below a directory'
+    'add:copy a skill into the managed source checkout'
     'source-path:print the managed source checkout'
     'cd:open a shell in the managed source checkout'
     'completion:generate shell completion'
@@ -272,6 +327,14 @@ _pa2_skills() {
       case $state in
         conflict) _values 'conflict policy' $conflicts ;;
       esac
+      ;;
+    discover)
+      _files -/
+      ;;
+    add)
+      _arguments -s \
+        '--name=[tracked skill name]:name:' \
+        '1:skill directory:_files -/'
       ;;
     completion)
       _values 'format' zsh values
