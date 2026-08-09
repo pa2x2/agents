@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/pa2x2/agents/src/internal/pa2skills"
+	"pa2-skills/internal/pa2skills"
 )
 
 var version = "development"

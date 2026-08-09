@@ -18,7 +18,7 @@ import (
 	"time"
 )
 
-const defaultReleaseBaseURL = "https://github.com/pa2x2/agents/releases"
+var defaultReleaseBaseURL string
 
 func UpdateBinary(currentVersion string, checkOnly bool) (string, error) {
 	if currentVersion == "development" || currentVersion == "" {
@@ -27,6 +27,9 @@ func UpdateBinary(currentVersion string, checkOnly bool) (string, error) {
 	baseURL := strings.TrimRight(os.Getenv("PA2_SKILLS_RELEASE_BASE_URL"), "/")
 	if baseURL == "" {
 		baseURL = defaultReleaseBaseURL
+	}
+	if baseURL == "" {
+		return "release repository is not configured; automatic upgrade skipped", nil
 	}
 	client := &http.Client{Timeout: 30 * time.Second}
 	request, err := http.NewRequest(http.MethodGet, baseURL+"/latest", nil)

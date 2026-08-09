@@ -4,13 +4,6 @@
 curl -fsSL https://raw.githubusercontent.com/pa2x2/agents/master/src/bootstrap.sh | sh
 ```
 
-To install a particular release binary, select the matching tag:
-
-```sh
-curl -fsSL https://raw.githubusercontent.com/pa2x2/agents/master/src/bootstrap.sh | \
-  PA2_SKILLS_VERSION=v0.1.0 sh
-```
-
 The managed source checkout is `~/.local/share/pa2-skills/agents` by default and private deployment state is `~/.local/state/pa2-skills`. These follow `XDG_DATA_HOME` and `XDG_STATE_HOME` when set.
 
 Ensure `~/.local/bin` is on `PATH` if needed, then inspect the available skills:

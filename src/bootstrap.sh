@@ -1,8 +1,9 @@
 #!/bin/sh
 set -eu
 
-repository_url="${PA2_SKILLS_REPOSITORY_URL:-https://github.com/pa2x2/agents.git}"
-release_base_url="${PA2_SKILLS_RELEASE_BASE_URL:-https://github.com/pa2x2/agents/releases}"
+github_repository="${PA2_SKILLS_GITHUB_REPOSITORY:-pa2x2/agents}"
+repository_url="${PA2_SKILLS_REPOSITORY_URL:-https://github.com/$github_repository.git}"
+release_base_url="${PA2_SKILLS_RELEASE_BASE_URL:-https://github.com/$github_repository/releases}"
 release_version="${PA2_SKILLS_VERSION:-latest}"
 data_home="${PA2_SKILLS_DATA_HOME:-${XDG_DATA_HOME:-$HOME/.local/share}}"
 state_home="${PA2_SKILLS_STATE_HOME:-${XDG_STATE_HOME:-$HOME/.local/state}}"

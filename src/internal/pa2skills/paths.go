@@ -8,8 +8,6 @@ import (
 	"path/filepath"
 )
 
-const SourceRepositoryURL = "https://github.com/pa2x2/agents.git"
-
 type Paths struct {
 	Home       string
 	DataHome   string

@@ -1,3 +1,3 @@
-module github.com/pa2x2/agents/src
+module pa2-skills
 
 go 1.26
