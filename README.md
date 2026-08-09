@@ -24,10 +24,6 @@ Ensure `~/.local/bin` is on `PATH` if needed, then inspect the available skills:
 | `pa2-skills completion zsh` | Print dynamic Zsh completion. |
 | `pa2-skills doctor` | Check the managed source checkout and local prerequisites. |
 
-`install`, `sync`, and `update` accept `--conflict ask`, `--conflict overwrite`, or
-`--conflict skip`. The default, `ask`, prompts before replacing a locally
-modified installed copy.
-
 ## Zsh completion
 
 The completion is dynamic: it offers cached skill names and valid command values without fetching the network.
