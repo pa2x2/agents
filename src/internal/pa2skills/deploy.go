@@ -147,11 +147,54 @@ func (m Manager) Install(skill string, scope Scope, harnesses []string, policy C
 	return nil
 }
 
-func (m Manager) Update(skill string, scope Scope, harnesses []string, policy ConflictPolicy) error {
+func (m Manager) Sync(skill string, scope Scope, harnesses []string, policy ConflictPolicy) error {
 	if err := m.refreshSource(); err != nil {
 		return err
 	}
 	return m.Install(skill, scope, harnesses, policy)
+}
+
+func (m Manager) UpdateAll(policy ConflictPolicy) error {
+	if err := m.refreshSource(); err != nil {
+		return err
+	}
+	installations, err := m.Paths.installations()
+	if err != nil {
+		return err
+	}
+	activePolicy := policy
+	for _, stored := range installations {
+		installation := stored.Installation
+		source, ref, err := m.skillSource(installation.Skill)
+		if err != nil {
+			return fmt.Errorf("sync %s at %s: %w", installation.Skill, installation.Target, err)
+		}
+		if err := m.updateTarget(installation, stored.Key, source, ref, &activePolicy); err != nil {
+			return err
+		}
+	}
+	fmt.Fprintf(m.Stdout, "Skills: synchronized %d managed installation(s)\n", len(installations))
+	return nil
+}
+
+func (m Manager) CheckSource() (string, error) {
+	local, err := exec.Command("git", "-C", m.Paths.SourceRoot, "rev-parse", "HEAD").Output()
+	if err != nil {
+		return "", fmt.Errorf("inspect source checkout: %w", err)
+	}
+	remote, err := exec.Command("git", "-C", m.Paths.SourceRoot, "ls-remote", "origin", "HEAD").Output()
+	if err != nil {
+		return "", fmt.Errorf("check remote source: %w", err)
+	}
+	fields := strings.Fields(string(remote))
+	if len(fields) == 0 {
+		return "", errors.New("remote source did not return HEAD")
+	}
+	localRef := strings.TrimSpace(string(local))
+	if fields[0] == localRef {
+		return fmt.Sprintf("already current at %.7s", localRef), nil
+	}
+	return fmt.Sprintf("update available: %.7s -> %.7s", localRef, fields[0]), nil
 }
 
 func (m Manager) updateTarget(installation Installation, key, source, ref string, policy *ConflictPolicy) error {
@@ -319,6 +362,7 @@ func (m Manager) targetPath(skill string, scope Scope, harness, projectRoot stri
 }
 
 func (m Manager) refreshSource() error {
+	before, _ := exec.Command("git", "-C", m.Paths.SourceRoot, "rev-parse", "--short", "HEAD").Output()
 	status, err := exec.Command("git", "-C", m.Paths.SourceRoot, "status", "--porcelain").Output()
 	if err != nil {
 		return fmt.Errorf("inspect source checkout: %w", err)
@@ -327,9 +371,19 @@ func (m Manager) refreshSource() error {
 		return errors.New("source checkout has local changes; use pa2-skills cd to review, commit, or stash them before updating")
 	}
 	command := exec.Command("git", "-C", m.Paths.SourceRoot, "pull", "--ff-only")
-	command.Stdout = m.Stdout
 	command.Stderr = m.Stderr
-	return command.Run()
+	if err := command.Run(); err != nil {
+		return err
+	}
+	after, _ := exec.Command("git", "-C", m.Paths.SourceRoot, "rev-parse", "--short", "HEAD").Output()
+	beforeRef := strings.TrimSpace(string(before))
+	afterRef := strings.TrimSpace(string(after))
+	if beforeRef == afterRef {
+		fmt.Fprintf(m.Stdout, "Source: already current at %s\n", afterRef)
+	} else {
+		fmt.Fprintf(m.Stdout, "Source: updated %s -> %s\n", beforeRef, afterRef)
+	}
+	return nil
 }
 
 func installationWithRef(installation Installation, ref string) Installation {

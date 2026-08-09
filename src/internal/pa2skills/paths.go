@@ -56,6 +56,10 @@ func (p Paths) InstallStatePath(key string) string {
 	return filepath.Join(p.StateRoot(), "installations", key+".json")
 }
 
+func (p Paths) InstallationsRoot() string {
+	return filepath.Join(p.StateRoot(), "installations")
+}
+
 func (p Paths) BaselinePath(hash string) string {
 	return filepath.Join(p.StateRoot(), "baselines", hash)
 }

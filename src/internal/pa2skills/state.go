@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
+	"strings"
 	"time"
 )
 
@@ -62,6 +64,42 @@ func (p Paths) writeInstallation(key string, installation Installation) error {
 		return err
 	}
 	return os.Rename(temporaryName, p.InstallStatePath(key))
+}
+
+func (p Paths) installations() ([]struct {
+	Key          string
+	Installation Installation
+}, error) {
+	entries, err := os.ReadDir(p.InstallationsRoot())
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read installation state: %w", err)
+	}
+	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
+	result := make([]struct {
+		Key          string
+		Installation Installation
+	}, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+		contents, err := os.ReadFile(filepath.Join(p.InstallationsRoot(), entry.Name()))
+		if err != nil {
+			return nil, err
+		}
+		var installation Installation
+		if err := json.Unmarshal(contents, &installation); err != nil {
+			return nil, fmt.Errorf("read installation state %s: %w", entry.Name(), err)
+		}
+		result = append(result, struct {
+			Key          string
+			Installation Installation
+		}{strings.TrimSuffix(entry.Name(), ".json"), installation})
+	}
+	return result, nil
 }
 
 func (p Paths) saveBaseline(source string) (string, error) {

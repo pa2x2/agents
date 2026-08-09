@@ -40,20 +40,33 @@ pa2-skills install create-agent-workspace \
 | Claude Code | `~/.claude/skills/<skill>` | `.claude/skills/<skill>` |
 | OpenCode | `~/.config/opencode/skills/<skill>` | `.opencode/skills/<skill>` |
 
-## Update a skill
+## Sync a skill
 
 ```sh
-pa2-skills update create-agent-workspace \
+pa2-skills sync create-agent-workspace \
   --scope project \
   --harness codex,claude
 ```
+
+## Update pa2-skills
+
+Check for a newer verified release binary, fast-forward the managed source
+checkout, and synchronize every managed skill installation:
+
+```sh
+pa2-skills update
+```
+
+Use `pa2-skills update --check` to report binary and source updates without
+changing files. `--binary-only` and `--skills-only` limit the operation.
 
 ## Commands reference
 
 | Command | Purpose |
 |---|---|
 | `pa2-skills install <skill> --scope user\|project --harness <harnesses>` | Install a skill for the selected scope and comma-separated harnesses. |
-| `pa2-skills update <skill> --scope user\|project --harness <harnesses>` | Fetch the source repository and refresh an installed skill. |
+| `pa2-skills sync <skill> --scope user\|project --harness <harnesses>` | Fetch the source repository and refresh one installed skill. |
+| `pa2-skills update` | Upgrade the binary and synchronize the source and all managed skill installations. |
 | `pa2-skills list` | List skills available from the managed source checkout. |
 | `pa2-skills version` | Print the installed command version. |
 | `pa2-skills source-path` | Print the managed source checkout path. |
@@ -61,7 +74,7 @@ pa2-skills update create-agent-workspace \
 | `pa2-skills completion zsh` | Print dynamic Zsh completion. |
 | `pa2-skills doctor` | Check the managed source checkout and local prerequisites. |
 
-`install` and `update` accept `--conflict ask`, `--conflict overwrite`, or
+`install`, `sync`, and `update` accept `--conflict ask`, `--conflict overwrite`, or
 `--conflict skip`. The default, `ask`, prompts before replacing a locally
 modified installed copy.
 

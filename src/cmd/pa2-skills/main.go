@@ -37,8 +37,10 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	case "version", "--version":
 		fmt.Fprintln(stdout, version)
 		return nil
-	case "install", "update":
-		return installOrUpdate(arguments[0], arguments[1:], manager, stdout)
+	case "install", "sync":
+		return installOrSync(arguments[0], arguments[1:], manager, stdout)
+	case "update":
+		return updateInstallation(arguments[1:], manager, stdout, stderr)
 	case "list":
 		return listSkills(manager, stdout)
 	case "source-path":
@@ -58,7 +60,7 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	}
 }
 
-func installOrUpdate(command string, arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
+func installOrSync(command string, arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
 	if len(arguments) == 0 || strings.HasPrefix(arguments[0], "-") {
 		return fmt.Errorf("usage: pa2-skills %s <skill> --scope user|project --harness codex,claude", command)
 	}
@@ -85,7 +87,49 @@ func installOrUpdate(command string, arguments []string, manager pa2skills.Manag
 	if command == "install" {
 		return manager.Install(skill, pa2skills.Scope(*scope), selectedHarnesses, policy)
 	}
-	return manager.Update(skill, pa2skills.Scope(*scope), selectedHarnesses, policy)
+	return manager.Sync(skill, pa2skills.Scope(*scope), selectedHarnesses, policy)
+}
+
+func updateInstallation(arguments []string, manager pa2skills.Manager, stdout, stderr io.Writer) error {
+	flags := flag.NewFlagSet("update", flag.ContinueOnError)
+	flags.SetOutput(stdout)
+	check := flags.Bool("check", false, "report available updates without changing files")
+	binOnly := flags.Bool("binary-only", false, "only update the pa2-skills binary")
+	skillsOnly := flags.Bool("skills-only", false, "only update the source and managed skills")
+	conflict := flags.String("conflict", "ask", "ask, overwrite, or skip")
+	if err := flags.Parse(arguments); err != nil {
+		return err
+	}
+	if flags.NArg() != 0 {
+		return errors.New("usage: pa2-skills update [--check] [--binary-only|--skills-only] [--conflict ask|overwrite|skip]")
+	}
+	if *binOnly && *skillsOnly {
+		return errors.New("--binary-only and --skills-only cannot be used together")
+	}
+	policy := pa2skills.ConflictPolicy(*conflict)
+	if policy != pa2skills.ConflictAsk && policy != pa2skills.ConflictOverwrite && policy != pa2skills.ConflictSkip {
+		return errors.New("--conflict must be ask, overwrite, or skip")
+	}
+	if !*skillsOnly {
+		result, err := pa2skills.UpdateBinary(version, *check)
+		if err != nil {
+			fmt.Fprintf(stderr, "Binary: check failed: %v\n", err)
+		} else {
+			fmt.Fprintf(stdout, "Binary: %s\n", result)
+		}
+	}
+	if *binOnly {
+		return nil
+	}
+	if *check {
+		result, err := manager.CheckSource()
+		if err != nil {
+			return err
+		}
+		fmt.Fprintf(stdout, "Source: %s\n", result)
+		return nil
+	}
+	return manager.UpdateAll(policy)
 }
 
 func listSkills(manager pa2skills.Manager, stdout io.Writer) error {
@@ -177,7 +221,8 @@ func splitValues(value string) []string {
 func printUsage(writer io.Writer) {
 	fmt.Fprint(writer, `Usage:
   pa2-skills install <skill> --scope user|project --harness codex,claude [--conflict ask|overwrite|skip]
-  pa2-skills update <skill> --scope user|project --harness codex,claude [--conflict ask|overwrite|skip]
+  pa2-skills sync <skill> --scope user|project --harness codex,claude [--conflict ask|overwrite|skip]
+  pa2-skills update [--check] [--binary-only|--skills-only] [--conflict ask|overwrite|skip]
   pa2-skills list
   pa2-skills source-path
   pa2-skills cd [path]
@@ -191,8 +236,9 @@ const zshCompletion = `#compdef pa2-skills
 _pa2_skills() {
   local -a commands skills harnesses scopes conflicts
   commands=(
-    'install:install or refresh a skill'
-    'update:fetch the source repository and refresh a skill'
+	'install:install or refresh a skill'
+	'sync:fetch the source repository and refresh a skill'
+	'update:update the binary, source, and managed skills'
 	    'version:print the installed command version'
     'list:list available skills'
     'source-path:print the managed source checkout'
@@ -204,7 +250,7 @@ _pa2_skills() {
   scopes=(user project)
   conflicts=(ask overwrite skip)
   case $words[2] in
-    install|update)
+    install|sync)
       _arguments -s \
         '--scope=[installation scope]:scope:->scope' \
         '--harness=[comma-separated harnesses]:harness:->harness' \
@@ -215,6 +261,16 @@ _pa2_skills() {
         harness) _values -s , 'harness' $harnesses ;;
         conflict) _values 'conflict policy' $conflicts ;;
         skill) skills=("${(@f)$($words[1] completion values 2>/dev/null)}"); _describe -t skills skill skills ;;
+      esac
+      ;;
+    update)
+      _arguments -s \
+        '--check[report available updates without changing files]' \
+        '--binary-only[only update the pa2-skills binary]' \
+        '--skills-only[only update source and managed skills]' \
+        '--conflict=[conflict policy]:policy:->conflict'
+      case $state in
+        conflict) _values 'conflict policy' $conflicts ;;
       esac
       ;;
     completion)
