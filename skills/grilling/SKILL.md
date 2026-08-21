@@ -15,7 +15,7 @@ Each question should be formatted like so:
 ➡️ <your recommended answer>
 ```
 
-Each choice must have a "short name" that will be easy for user to pick:
+Each choice must have a "short name" that will be easy for user to pick, each on new line:
 
 ```
 A: Choice 1
