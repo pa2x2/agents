@@ -3,28 +3,54 @@ name: grilling
 description: Grill the user relentlessly about a plan, decision, or idea. Use when the user wants to stress-test their thinking, or uses any 'grill' trigger phrases.
 ---
 
-Interview the user relentlessly until you reach a shared understanding. Map this as a **design tree**: every decision branches into the decisions that hang off it.
+Interview the user relentlessly until you reach a shared understanding. Model the discussion as a **design tree**: each decision may unlock branch-specific follow-up decisions.
 
-Work the tree in **rounds**. The **frontier** is every decision whose prerequisites are already settled: the questions you can ask _now_ without guessing at answers you haven't heard yet. Ask the whole frontier in one round: number each question and give your recommended answer. Then wait for the user's answers before the next round.
+## Decision state
 
-Each question should be formatted like so:
+Maintain a private dependency ledger:
 
-```
-❓ **Q1** - **<question title>**: <question body, might be multiple paragraphs, including multiple choices>
+- **Settled**: facts you verified and decisions the user explicitly made in an earlier message.
+- **Unsettled**: every decision not yet explicitly answered by the user.
+- Your recommendation is **not** settled. It is advice, never a substitute for the user’s decision.
 
-➡️ <your recommended answer>
-```
+Finding facts is your job; decisions are the user’s. Use available tools to discover facts instead of asking the user for information you can verify.
 
-Each choice must have a "short name" that will be easy for user to pick, each on new line:
+## Rounds and frontier
 
-```
-A: Choice 1
-B: Choice 2
-... other choices
-```
+Work in rounds. The **frontier** is the set of questions whose prerequisites are all settled.
 
-Each round the user answers reshapes the tree: settled decisions push the frontier outward and unblock questions that depended on them. Recompute the frontier and ask the next round. A question whose answer depends on another question still open in this round belongs to a _later_ round, not this one.
+For each round:
 
-Finding _facts_ is your job, never the user's. When a frontier question needs a fact from the environment (filesystem, tools, etc.), dispatch a sub-agent to find it; don't ask the user for anything you could look up yourself. Don't block on it: a running exploration is an unsettled prerequisite, so only the questions downstream of it wait for the sub-agent to report; ask the rest of the frontier now. The _decisions_ are the user's: put each to them and wait.
+1. Identify each candidate question and its prerequisites.
+2. Include it only if every prerequisite is settled.
+3. Ask every eligible, mutually independent question in the same round.
+4. Give a recommendation for each question.
+5. Wait for the user’s answers before asking another round.
 
-The session is done when the frontier is empty: every branch of the design tree visited, nothing left silently assumed. Do not act on it until the user confirms you have reached a shared understanding.
+Questions in one round must be mutually independent. Changing the user’s answer to any other open question in that round must not change this question’s:
+
+- applicability;
+- wording or title;
+- available choices;
+- recommendation; or
+- interpretation of the answer.
+
+Before sending a round, perform this counterfactual audit: for every question, imagine the user choosing each other possible answer to every open question in the round. If any choice would make the question invalid, differently worded, differently recommended, or differently interpreted, defer it to a later round.
+
+Do not use wording that presupposes an unsettled decision, such as “the selected option,” “the alternative,” “that approach,” or a branch-specific title. Ask the parent decision first; ask its scope, implementation, and trade-off questions only after the user explicitly chooses that branch.
+
+If fact-finding is still running, treat the needed fact as an unsettled prerequisite. Ask the rest of the frontier now and defer only questions that require that fact.
+
+## Question format
+
+Number each question and provide concise, selectable options:
+
+```text
+❓ **Q1** - **<title>**: <question body>
+
+A: <short choice name> — <meaning>
+B: <short choice name> — <meaning>
+C: <short choice name> — <meaning>
+
+➡️ **Recommendation: <short choice name>.** <reasoning>
+
