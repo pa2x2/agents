@@ -10,6 +10,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"text/tabwriter"
 
 	"pa2-skills/internal/pa2skills"
 )
@@ -55,6 +56,8 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 			return err
 		}
 		return listSkills(manager, stdout)
+	case "status":
+		return showStatus(arguments[1:], manager, stdout)
 	case "discover":
 		return discoverSkills(arguments[1:], manager, stdout)
 	case "add":
@@ -336,6 +339,29 @@ func listSkills(manager pa2skills.Manager, stdout io.Writer) error {
 	return nil
 }
 
+func showStatus(arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
+	flags := newFlagSet("status")
+	skills, err := parseArguments(flags, arguments)
+	if err != nil {
+		return err
+	}
+	statuses, err := manager.Status(skills)
+	if err != nil {
+		return err
+	}
+	if len(statuses) == 0 {
+		fmt.Fprintln(stdout, "No managed installations.")
+		return nil
+	}
+	writer := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(writer, "STATUS\tSKILL\tHARNESS\tSCOPE\tTARGET")
+	for _, status := range statuses {
+		installation := status.Installation
+		fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\n", status.Status, installation.Skill, installation.Harness, installation.Scope, installation.Target)
+	}
+	return writer.Flush()
+}
+
 func changeDirectory(arguments []string, sourceRoot string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if len(arguments) > 1 {
 		return errors.New("usage: pa2-skills cd [path]")
@@ -488,6 +514,21 @@ var commandHelps = []commandHelp{
 `,
 	},
 	{name: "list", usage: "list", summary: "List skills available from the managed source checkout."},
+	{
+		name:    "status",
+		usage:   "status [skill...]",
+		summary: "Show every managed installation and how it compares with the local source checkout.",
+		details: `Statuses:
+  current     matches the source checkout
+  outdated    the source checkout changed; run pa2-skills install or update to refresh it
+  modified    changed locally since pa2-skills last wrote it
+  diverged    changed both locally and in the source checkout
+  missing     the installed directory was deleted
+  orphaned    the skill is no longer in the source checkout
+
+Run 'pa2-skills update --check' to see whether the remote source has changes.
+`,
+	},
 	{name: "discover", usage: "discover [path]", summary: "Report skills found below the current or supplied directory."},
 	{
 		name:    "add",
@@ -552,6 +593,7 @@ _pa2_skills() {
     'update:update the binary, source, and managed skills'
     'version:print the installed command version'
     'list:list available skills'
+    'status:show managed installations'
     'discover:find skills below a directory'
     'add:copy a skill into the managed source checkout'
     'source-path:print the managed source checkout'
@@ -603,6 +645,9 @@ _pa2_skills() {
       case $state in
         conflict) _values 'conflict policy' $conflicts ;;
       esac
+      ;;
+    status)
+      skills=("${(@f)$($words[1] completion values 2>/dev/null)}"); _describe -t skills skill skills
       ;;
     discover)
       _files -/

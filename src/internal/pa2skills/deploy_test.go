@@ -236,3 +236,39 @@ func TestInstallRestoresDeletedManagedTarget(t *testing.T) {
 		t.Fatalf("target = %q, want first", got)
 	}
 }
+
+func TestStatusClassifiesInstallations(t *testing.T) {
+	manager, paths := testManager(t)
+	writeSkill(t, paths.SourceRoot, "example", "first")
+	if err := manager.Install([]string{"example"}, ScopeUser, []string{"claude", "codex", "opencode"}, ConflictAsk); err != nil {
+		t.Fatal(err)
+	}
+	writeFile(t, filepath.Join(paths.Home, ".claude", "skills", "example", "SKILL.md"), "local")
+	if err := os.RemoveAll(filepath.Join(paths.ConfigHome, "opencode", "skills", "example")); err != nil {
+		t.Fatal(err)
+	}
+	statuses, err := manager.Status(nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, status := range statuses {
+		got[status.Installation.Harness] = status.Status
+	}
+	want := map[string]string{"claude": StatusModified, "codex": StatusCurrent, "opencode": StatusMissing}
+	for harness, status := range want {
+		if got[harness] != status {
+			t.Fatalf("statuses = %v, want %v", got, want)
+		}
+	}
+	writeSkill(t, paths.SourceRoot, "example", "second")
+	if statuses, err = manager.Status([]string{"example"}); err != nil {
+		t.Fatal(err)
+	}
+	for _, status := range statuses {
+		got[status.Installation.Harness] = status.Status
+	}
+	if got["claude"] != StatusDiverged || got["codex"] != StatusOutdated {
+		t.Fatalf("statuses after source change = %v", got)
+	}
+}
