@@ -15,6 +15,9 @@ import (
 
 var Harnesses = []string{"claude", "codex", "opencode"}
 
+// HarnessAll selects every supported harness.
+const HarnessAll = "all"
+
 type Scope string
 
 const (
@@ -394,6 +397,26 @@ func installationWithRef(installation Installation, ref string) Installation {
 	return installation
 }
 
+// ExpandHarnesses replaces HarnessAll with every supported harness and removes duplicates.
+func ExpandHarnesses(values []string) []string {
+	seen := map[string]bool{}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		expanded := []string{value}
+		if value == HarnessAll {
+			expanded = Harnesses
+		}
+		for _, harness := range expanded {
+			if !seen[harness] {
+				seen[harness] = true
+				result = append(result, harness)
+			}
+		}
+	}
+	sort.Strings(result)
+	return result
+}
+
 func ValidateInstallArguments(skill string, scope Scope, harnesses []string, policy ConflictPolicy) error {
 	var validationErrors []error
 	if skill == "" {
@@ -421,7 +444,7 @@ func ValidateInstallArguments(skill string, scope Scope, harnesses []string, pol
 			valid = valid || harness == supported
 		}
 		if !valid {
-			validationErrors = append(validationErrors, fmt.Errorf("unsupported harness %q (supported: %s)", harness, strings.Join(Harnesses, ", ")))
+			validationErrors = append(validationErrors, fmt.Errorf("unsupported harness %q (supported: %s, %s)", harness, strings.Join(Harnesses, ", "), HarnessAll))
 		}
 	}
 	return errors.Join(validationErrors...)

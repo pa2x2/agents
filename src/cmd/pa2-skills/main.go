@@ -150,7 +150,7 @@ func installOrSync(command string, arguments []string, manager pa2skills.Manager
 	flags := flag.NewFlagSet(command, flag.ContinueOnError)
 	flags.SetOutput(stdout)
 	scope := flags.String("scope", "", "user or project")
-	harnesses := flags.String("harness", "", "comma-separated harnesses")
+	harnesses := flags.String("harness", "", "comma-separated harnesses, or all")
 	conflict := flags.String("conflict", "ask", "ask, overwrite, or skip")
 	if err := flags.Parse(flagArguments); err != nil {
 		return err
@@ -160,7 +160,7 @@ func installOrSync(command string, arguments []string, manager pa2skills.Manager
 		validationErrors = append(validationErrors, fmt.Errorf("unexpected argument(s): %s", strings.Join(flags.Args(), ", ")))
 	}
 	policy := pa2skills.ConflictPolicy(*conflict)
-	selectedHarnesses := splitValues(*harnesses)
+	selectedHarnesses := pa2skills.ExpandHarnesses(splitValues(*harnesses))
 	if err := pa2skills.ValidateInstallArguments(skill, pa2skills.Scope(*scope), selectedHarnesses, policy); err != nil {
 		validationErrors = append(validationErrors, err)
 	}
@@ -336,8 +336,8 @@ func splitValues(value string) []string {
 
 func printUsage(writer io.Writer) {
 	fmt.Fprint(writer, `Usage:
-  pa2-skills install <skill> --scope user|project --harness codex,claude [--conflict ask|overwrite|skip]
-  pa2-skills sync <skill> --scope user|project --harness codex,claude [--conflict ask|overwrite|skip]
+  pa2-skills install <skill> --scope user|project --harness codex,claude|all [--conflict ask|overwrite|skip]
+  pa2-skills sync <skill> --scope user|project --harness codex,claude|all [--conflict ask|overwrite|skip]
   pa2-skills update [--check] [--binary-only|--skills-only] [--conflict ask|overwrite|skip]
   pa2-skills list
   pa2-skills discover [path]
@@ -367,7 +367,7 @@ _pa2_skills() {
     'completion:generate shell completion'
     'doctor:check the local installation'
   )
-  harnesses=(claude codex opencode)
+  harnesses=(all claude codex opencode)
   scopes=(user project)
   conflicts=(ask overwrite skip)
   command=$words[2]
@@ -379,7 +379,7 @@ _pa2_skills() {
     install|sync)
       _arguments -s \
         '--scope=[installation scope]:scope:->scope' \
-        '--harness=[comma-separated harnesses]:harness:->harness' \
+        '--harness=[comma-separated harnesses, or all]:harness:->harness' \
         '--conflict=[conflict policy]:policy:->conflict' \
         '1:skill:->skill'
       case $state in

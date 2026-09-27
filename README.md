@@ -12,7 +12,7 @@ Ensure `~/.local/bin` is on `PATH` if needed, then inspect the available skills:
 
 | Command | Purpose |
 |---|---|
-| `pa2-skills install <skill> --scope user\|project --harness <harnesses>` | Install a skill for the selected scope and comma-separated harnesses. |
+| `pa2-skills install <skill> --scope user\|project --harness <harnesses>` | Install a skill for the selected scope and comma-separated harnesses (`all` selects every supported harness). |
 | `pa2-skills sync <skill> --scope user\|project --harness <harnesses>` | Fetch the source repository and refresh one installed skill. |
 | `pa2-skills update` | Upgrade the binary and synchronize the source and all managed skill installations. |
 | `pa2-skills list` | List skills available from the managed source checkout. |

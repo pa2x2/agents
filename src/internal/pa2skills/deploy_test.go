@@ -138,3 +138,10 @@ func readFile(t *testing.T, path string) string {
 	}
 	return string(contents)
 }
+
+func TestExpandHarnessesResolvesAll(t *testing.T) {
+	got := strings.Join(ExpandHarnesses([]string{"codex", "all", "claude"}), ",")
+	if want := "claude,codex,opencode"; got != want {
+		t.Fatalf("harnesses = %q, want %q", got, want)
+	}
+}
