@@ -18,6 +18,9 @@ var Harnesses = []string{"claude", "codex", "opencode"}
 // HarnessAll selects every supported harness.
 const HarnessAll = "all"
 
+// SkillAll selects every skill in the managed source checkout.
+const SkillAll = "all"
+
 type Scope string
 
 const (
@@ -59,19 +62,55 @@ func (m Manager) SkillNames() ([]string, error) {
 	return names, nil
 }
 
-func (m Manager) Install(skill string, scope Scope, harnesses []string, policy ConflictPolicy) error {
-	if err := ValidateInstallArguments(skill, scope, harnesses, policy); err != nil {
+func (m Manager) Install(skills []string, scope Scope, harnesses []string, policy ConflictPolicy) error {
+	if err := ValidateInstallArguments(skills, scope, harnesses, policy); err != nil {
 		return err
 	}
 	projectRoot, err := m.projectRoot(scope)
 	if err != nil {
 		return err
 	}
-	source, ref, err := m.skillSource(skill)
+	skills, err = m.ExpandSkills(skills)
 	if err != nil {
 		return err
 	}
 	activePolicy := policy
+	for _, skill := range skills {
+		if err := m.installSkill(skill, scope, harnesses, projectRoot, &activePolicy); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ExpandSkills replaces SkillAll with every available skill and removes duplicates.
+func (m Manager) ExpandSkills(values []string) ([]string, error) {
+	seen := map[string]bool{}
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		expanded := []string{value}
+		if value == SkillAll {
+			names, err := m.SkillNames()
+			if err != nil {
+				return nil, err
+			}
+			expanded = names
+		}
+		for _, skill := range expanded {
+			if !seen[skill] {
+				seen[skill] = true
+				result = append(result, skill)
+			}
+		}
+	}
+	return result, nil
+}
+
+func (m Manager) installSkill(skill string, scope Scope, harnesses []string, projectRoot string, activePolicy *ConflictPolicy) error {
+	source, ref, err := m.skillSource(skill)
+	if err != nil {
+		return err
+	}
 	for _, harness := range harnesses {
 		target, err := m.targetPath(skill, scope, harness, projectRoot)
 		if err != nil {
@@ -83,7 +122,7 @@ func (m Manager) Install(skill string, scope Scope, harnesses []string, policy C
 			return err
 		}
 		if known {
-			if err := m.updateTarget(current, key, source, ref, &activePolicy); err != nil {
+			if err := m.updateTarget(current, key, source, ref, activePolicy); err != nil {
 				return err
 			}
 			continue
@@ -111,9 +150,13 @@ func (m Manager) Install(skill string, scope Scope, harnesses []string, policy C
 				fmt.Fprintf(m.Stdout, "Adopted matching %s for %s at %s\n", skill, harness, target)
 				continue
 			}
-			decision, err := m.resolveUnmanagedConflict(target, source, activePolicy)
+			decision, err := m.resolveUnmanagedConflict(target, source, *activePolicy)
 			if err != nil {
 				return err
+			}
+			if decision == ConflictAllOverwrite {
+				*activePolicy = ConflictOverwrite
+				decision = ConflictOverwrite
 			}
 			if decision == ConflictOverwrite {
 				if err := m.materialize(installation, key, source); err != nil {
@@ -150,14 +193,14 @@ func (m Manager) Install(skill string, scope Scope, harnesses []string, policy C
 	return nil
 }
 
-func (m Manager) Sync(skill string, scope Scope, harnesses []string, policy ConflictPolicy) error {
-	if err := ValidateInstallArguments(skill, scope, harnesses, policy); err != nil {
+func (m Manager) Sync(skills []string, scope Scope, harnesses []string, policy ConflictPolicy) error {
+	if err := ValidateInstallArguments(skills, scope, harnesses, policy); err != nil {
 		return err
 	}
 	if err := m.refreshSource(); err != nil {
 		return err
 	}
-	return m.Install(skill, scope, harnesses, policy)
+	return m.Install(skills, scope, harnesses, policy)
 }
 
 func (m Manager) UpdateAll(policy ConflictPolicy) error {
@@ -295,7 +338,7 @@ func (m Manager) resolveUnmanagedConflict(target, source string, policy Conflict
 	}
 	reader := bufio.NewReader(m.Stdin)
 	for {
-		fmt.Fprintf(m.Stdout, "%s exists but was not installed by this machine.\n> diff / overwrite / skip / quit\n", target)
+		fmt.Fprintf(m.Stdout, "%s exists but was not installed by this machine.\n> diff / overwrite / all-overwrite / skip / quit\n", target)
 		choice, err := reader.ReadString('\n')
 		if err != nil && !errors.Is(err, io.EOF) {
 			return "", err
@@ -307,12 +350,14 @@ func (m Manager) resolveUnmanagedConflict(target, source string, policy Conflict
 			}
 		case "overwrite":
 			return ConflictOverwrite, nil
+		case "all-overwrite":
+			return ConflictAllOverwrite, nil
 		case "skip":
 			return ConflictSkip, nil
 		case "quit", "":
 			return "", errors.New("installation cancelled")
 		default:
-			fmt.Fprintln(m.Stdout, "Choose diff, overwrite, skip, or quit.")
+			fmt.Fprintln(m.Stdout, "Choose diff, overwrite, all-overwrite, skip, or quit.")
 		}
 	}
 }
@@ -417,12 +462,18 @@ func ExpandHarnesses(values []string) []string {
 	return result
 }
 
-func ValidateInstallArguments(skill string, scope Scope, harnesses []string, policy ConflictPolicy) error {
+func ValidateInstallArguments(skills []string, scope Scope, harnesses []string, policy ConflictPolicy) error {
 	var validationErrors []error
-	if skill == "" {
-		validationErrors = append(validationErrors, errors.New("skill name is required"))
-	} else if err := ValidateSkillName(skill); err != nil {
-		validationErrors = append(validationErrors, err)
+	if len(skills) == 0 {
+		validationErrors = append(validationErrors, errors.New("at least one skill name is required"))
+	}
+	for _, skill := range skills {
+		if skill == SkillAll {
+			continue
+		}
+		if err := ValidateSkillName(skill); err != nil {
+			validationErrors = append(validationErrors, err)
+		}
 	}
 	if scope != ScopeUser && scope != ScopeProject {
 		validationErrors = append(validationErrors, errors.New("--scope must be user or project"))

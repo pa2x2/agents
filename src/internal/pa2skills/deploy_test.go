@@ -12,7 +12,7 @@ func TestInstallCopiesSkillAndStoresPrivateState(t *testing.T) {
 	manager, paths := testManager(t)
 	writeSkill(t, paths.SourceRoot, "example", "first")
 
-	if err := manager.Install("example", ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
 		t.Fatal(err)
 	}
 	target := filepath.Join(paths.Home, ".agents", "skills", "example", "SKILL.md")
@@ -31,11 +31,11 @@ func TestInstallCopiesSkillAndStoresPrivateState(t *testing.T) {
 func TestInstallRefreshesUnmodifiedTarget(t *testing.T) {
 	manager, paths := testManager(t)
 	writeSkill(t, paths.SourceRoot, "example", "first")
-	if err := manager.Install("example", ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
 		t.Fatal(err)
 	}
 	writeSkill(t, paths.SourceRoot, "example", "second")
-	if err := manager.Install("example", ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, filepath.Join(paths.Home, ".agents", "skills", "example", "SKILL.md")); got != "second" {
@@ -46,12 +46,12 @@ func TestInstallRefreshesUnmodifiedTarget(t *testing.T) {
 func TestInstallPreservesLocalOnlyChange(t *testing.T) {
 	manager, paths := testManager(t)
 	writeSkill(t, paths.SourceRoot, "example", "first")
-	if err := manager.Install("example", ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
 		t.Fatal(err)
 	}
 	target := filepath.Join(paths.Home, ".agents", "skills", "example", "SKILL.md")
 	writeFile(t, target, "local")
-	if err := manager.Install("example", ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, target); got != "local" {
@@ -62,19 +62,19 @@ func TestInstallPreservesLocalOnlyChange(t *testing.T) {
 func TestInstallRespectsConflictPolicy(t *testing.T) {
 	manager, paths := testManager(t)
 	writeSkill(t, paths.SourceRoot, "example", "first")
-	if err := manager.Install("example", ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
 		t.Fatal(err)
 	}
 	target := filepath.Join(paths.Home, ".agents", "skills", "example", "SKILL.md")
 	writeFile(t, target, "local")
 	writeSkill(t, paths.SourceRoot, "example", "remote")
-	if err := manager.Install("example", ScopeUser, []string{"codex"}, ConflictSkip); err != nil {
+	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictSkip); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, target); got != "local" {
 		t.Fatalf("skipped target = %q, want local", got)
 	}
-	if err := manager.Install("example", ScopeUser, []string{"codex"}, ConflictOverwrite); err != nil {
+	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictOverwrite); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, target); got != "remote" {
@@ -88,13 +88,13 @@ func TestInstallAdoptsExistingCustomizedTarget(t *testing.T) {
 	target := filepath.Join(paths.Home, ".agents", "skills", "example", "SKILL.md")
 	writeFile(t, target, "team-customized")
 
-	if err := manager.Install("example", ScopeUser, []string{"codex"}, ConflictSkip); err != nil {
+	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictSkip); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, target); got != "team-customized" {
 		t.Fatalf("target = %q, want team-customized", got)
 	}
-	if err := manager.Install("example", ScopeUser, []string{"codex"}, ConflictSkip); err != nil {
+	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictSkip); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, target); got != "team-customized" {
@@ -143,5 +143,20 @@ func TestExpandHarnessesResolvesAll(t *testing.T) {
 	got := strings.Join(ExpandHarnesses([]string{"codex", "all", "claude"}), ",")
 	if want := "claude,codex,opencode"; got != want {
 		t.Fatalf("harnesses = %q, want %q", got, want)
+	}
+}
+
+func TestInstallAllInstallsEverySkill(t *testing.T) {
+	manager, paths := testManager(t)
+	writeSkill(t, paths.SourceRoot, "first", "one")
+	writeSkill(t, paths.SourceRoot, "second", "two")
+
+	if err := manager.Install([]string{"second", SkillAll}, ScopeUser, []string{"claude"}, ConflictAsk); err != nil {
+		t.Fatal(err)
+	}
+	for name, want := range map[string]string{"first": "one", "second": "two"} {
+		if got := readFile(t, filepath.Join(paths.Home, ".claude", "skills", name, "SKILL.md")); got != want {
+			t.Fatalf("%s = %q, want %q", name, got, want)
+		}
 	}
 }

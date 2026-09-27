@@ -238,26 +238,19 @@ func installOrSync(command string, arguments []string, manager pa2skills.Manager
 	if err != nil {
 		return err
 	}
-	skill := ""
-	if len(positionals) > 0 {
-		skill = positionals[0]
-	}
 	var validationErrors []error
-	if len(positionals) > 1 {
-		validationErrors = append(validationErrors, fmt.Errorf("unexpected argument(s): %s", strings.Join(positionals[1:], ", ")))
-	}
 	policy := pa2skills.ConflictPolicy(*conflict)
 	selectedHarnesses := pa2skills.ExpandHarnesses(splitValues(*harnesses))
-	if err := pa2skills.ValidateInstallArguments(skill, pa2skills.Scope(*scope), selectedHarnesses, policy); err != nil {
+	if err := pa2skills.ValidateInstallArguments(positionals, pa2skills.Scope(*scope), selectedHarnesses, policy); err != nil {
 		validationErrors = append(validationErrors, err)
 	}
 	if err := invalidArguments(validationErrors...); err != nil {
 		return err
 	}
 	if command == "install" {
-		return manager.Install(skill, pa2skills.Scope(*scope), selectedHarnesses, policy)
+		return manager.Install(positionals, pa2skills.Scope(*scope), selectedHarnesses, policy)
 	}
-	return manager.Sync(skill, pa2skills.Scope(*scope), selectedHarnesses, policy)
+	return manager.Sync(positionals, pa2skills.Scope(*scope), selectedHarnesses, policy)
 }
 
 func updateInstallation(arguments []string, manager pa2skills.Manager, stdout, stderr io.Writer) error {
@@ -438,14 +431,14 @@ type commandHelp struct {
 var commandHelps = []commandHelp{
 	{
 		name:    "install",
-		usage:   "install <skill> [--scope user|project] [--harness <harnesses>|all] [--conflict ask|overwrite|skip]",
-		summary: "Install a skill from the managed source checkout, or refresh an existing installation.",
+		usage:   "install <skill>...|all [--scope user|project] [--harness <harnesses>|all] [--conflict ask|overwrite|skip]",
+		summary: "Install skills from the managed source checkout, or refresh existing installations. all selects every available skill.",
 		details: installFlagsHelp,
 	},
 	{
 		name:    "sync",
-		usage:   "sync <skill> [--scope user|project] [--harness <harnesses>|all] [--conflict ask|overwrite|skip]",
-		summary: "Fetch the source repository, then install or refresh a skill.",
+		usage:   "sync <skill>...|all [--scope user|project] [--harness <harnesses>|all] [--conflict ask|overwrite|skip]",
+		summary: "Fetch the source repository, then install or refresh skills. all selects every available skill.",
 		details: installFlagsHelp,
 	},
 	{
@@ -545,12 +538,12 @@ _pa2_skills() {
         '--scope=[installation scope]:scope:->scope' \
         '--harness=[comma-separated harnesses, or all]:harness:->harness' \
         '--conflict=[conflict policy]:policy:->conflict' \
-        '1:skill:->skill'
+        '*:skill:->skill'
       case $state in
         scope) _values 'scope' $scopes ;;
         harness) _values -s , 'harness' $harnesses ;;
         conflict) _values 'conflict policy' $conflicts ;;
-        skill) skills=("${(@f)$($words[1] completion values 2>/dev/null)}"); _describe -t skills skill skills ;;
+        skill) skills=(all "${(@f)$($words[1] completion values 2>/dev/null)}"); _describe -t skills skill skills ;;
       esac
       ;;
     update)

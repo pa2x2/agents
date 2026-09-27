@@ -185,6 +185,9 @@ func ValidateSkillName(name string) error {
 	if name == "" || name == "." || name == ".." || filepath.Base(name) != name || strings.ContainsAny(name, `/\\`) {
 		return fmt.Errorf("invalid skill name %q", name)
 	}
+	if name == SkillAll {
+		return fmt.Errorf("skill name %q is reserved", name)
+	}
 	return nil
 }
 
