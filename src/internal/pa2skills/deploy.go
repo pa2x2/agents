@@ -37,6 +37,8 @@ const (
 	ConflictAllOverwrite ConflictPolicy = "all-overwrite"
 )
 
+var errUnknownSkill = errors.New("unknown skill")
+
 type Manager struct {
 	Paths  Paths
 	Stdin  io.Reader
@@ -121,7 +123,11 @@ func (m Manager) installSkill(skill string, scope Scope, harnesses []string, pro
 		if err != nil {
 			return err
 		}
-		if known {
+		currentHash, err := treeHash(target)
+		if err != nil {
+			return err
+		}
+		if known && currentHash != "" {
 			upToDate, err := m.updateTarget(current, key, source, ref, activePolicy)
 			if err != nil {
 				return err
@@ -131,9 +137,7 @@ func (m Manager) installSkill(skill string, scope Scope, harnesses []string, pro
 			}
 			continue
 		}
-		if currentHash, err := treeHash(target); err != nil {
-			return err
-		} else if currentHash != "" {
+		if !known && currentHash != "" {
 			installation := Installation{
 				Version:     1,
 				Scope:       string(scope),
@@ -218,7 +222,15 @@ func (m Manager) UpdateAll(policy ConflictPolicy) error {
 	activePolicy := policy
 	for _, stored := range installations {
 		installation := stored.Installation
+		if _, err := os.Lstat(installation.Target); os.IsNotExist(err) {
+			fmt.Fprintf(m.Stdout, "Missing %s for %s at %s; run pa2-skills install to restore it or pa2-skills remove to stop tracking it\n", installation.Skill, installation.Harness, installation.Target)
+			continue
+		}
 		source, ref, err := m.skillSource(installation.Skill)
+		if errors.Is(err, errUnknownSkill) {
+			fmt.Fprintf(m.Stdout, "Skipped %s for %s at %s: no longer in the source checkout; run pa2-skills remove to stop tracking it\n", installation.Skill, installation.Harness, installation.Target)
+			continue
+		}
 		if err != nil {
 			return fmt.Errorf("sync %s at %s: %w", installation.Skill, installation.Target, err)
 		}
@@ -390,7 +402,7 @@ func (m Manager) skillSource(skill string) (string, string, error) {
 	source := filepath.Join(m.Paths.SourceRoot, "skills", skill)
 	if _, err := os.Stat(filepath.Join(source, "SKILL.md")); err != nil {
 		if os.IsNotExist(err) {
-			return "", "", fmt.Errorf("unknown skill %q", skill)
+			return "", "", fmt.Errorf("%w %q", errUnknownSkill, skill)
 		}
 		return "", "", err
 	}

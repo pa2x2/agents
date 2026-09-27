@@ -173,3 +173,66 @@ func TestInstallReportsCurrentInstallation(t *testing.T) {
 		t.Fatalf("output = %q, want an already-current report", output)
 	}
 }
+
+func TestRemoveDeletesManagedInstallation(t *testing.T) {
+	manager, paths := testManager(t)
+	writeSkill(t, paths.SourceRoot, "example", "first")
+	if err := manager.Install([]string{"example"}, ScopeUser, []string{"claude", "codex"}, ConflictAsk); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.Remove([]string{"example"}, ScopeUser, []string{"claude"}, false); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(paths.Home, ".claude", "skills", "example")); !os.IsNotExist(err) {
+		t.Fatalf("claude target still exists: %v", err)
+	}
+	if got := readFile(t, filepath.Join(paths.Home, ".agents", "skills", "example", "SKILL.md")); got != "first" {
+		t.Fatalf("codex target = %q, want first", got)
+	}
+	if err := manager.Remove([]string{"example"}, ScopeUser, []string{"claude"}, false); err == nil {
+		t.Fatal("removing an untracked installation succeeded")
+	}
+}
+
+func TestRemoveKeepsLocalChangesUnlessForced(t *testing.T) {
+	manager, paths := testManager(t)
+	writeSkill(t, paths.SourceRoot, "example", "first")
+	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(paths.Home, ".agents", "skills", "example", "SKILL.md")
+	writeFile(t, target, "local")
+	if err := manager.Remove([]string{SkillAll}, ScopeUser, Harnesses, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, target); got != "local" {
+		t.Fatalf("target = %q, want local", got)
+	}
+	if err := manager.Remove([]string{SkillAll}, ScopeUser, Harnesses, true); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatalf("target still exists: %v", err)
+	}
+	if baselines, _ := os.ReadDir(paths.BaselinesRoot()); len(baselines) != 0 {
+		t.Fatalf("baselines = %d, want none", len(baselines))
+	}
+}
+
+func TestInstallRestoresDeletedManagedTarget(t *testing.T) {
+	manager, paths := testManager(t)
+	writeSkill(t, paths.SourceRoot, "example", "first")
+	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+		t.Fatal(err)
+	}
+	target := filepath.Join(paths.Home, ".agents", "skills", "example")
+	if err := os.RemoveAll(target); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, filepath.Join(target, "SKILL.md")); got != "first" {
+		t.Fatalf("target = %q, want first", got)
+	}
+}

@@ -45,7 +45,9 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		fmt.Fprintln(stdout, version)
 		return nil
 	case "install", "sync":
-		return installOrSync(arguments[0], arguments[1:], manager, stdout)
+		return installOrSync(arguments[0], arguments[1:], manager)
+	case "remove":
+		return removeSkills(arguments[1:], manager)
 	case "update":
 		return updateInstallation(arguments[1:], manager, stdout, stderr)
 	case "list":
@@ -229,10 +231,31 @@ func addSkill(arguments []string, manager pa2skills.Manager, stdout io.Writer) e
 	return nil
 }
 
-func installOrSync(command string, arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
-	flags := newFlagSet(command)
+// targetFlags registers the --scope and --harness flags shared by commands that select installations.
+func targetFlags(flags *flag.FlagSet) (*string, *string) {
 	scope := flags.String("scope", environmentDefault("PA2_SKILLS_SCOPE", string(pa2skills.ScopeUser)), "user or project")
 	harnesses := flags.String("harness", environmentDefault("PA2_SKILLS_HARNESS", pa2skills.HarnessAll), "comma-separated harnesses, or all")
+	return scope, harnesses
+}
+
+func removeSkills(arguments []string, manager pa2skills.Manager) error {
+	flags := newFlagSet("remove")
+	scope, harnesses := targetFlags(flags)
+	force := flags.Bool("force", false, "remove installations with local changes")
+	positionals, err := parseArguments(flags, arguments)
+	if err != nil {
+		return err
+	}
+	selectedHarnesses := pa2skills.ExpandHarnesses(splitValues(*harnesses))
+	if err := pa2skills.ValidateInstallArguments(positionals, pa2skills.Scope(*scope), selectedHarnesses, pa2skills.ConflictAsk); err != nil {
+		return invalidArguments(err)
+	}
+	return manager.Remove(positionals, pa2skills.Scope(*scope), selectedHarnesses, *force)
+}
+
+func installOrSync(command string, arguments []string, manager pa2skills.Manager) error {
+	flags := newFlagSet(command)
+	scope, harnesses := targetFlags(flags)
 	conflict := flags.String("conflict", "ask", "ask, overwrite, or skip")
 	positionals, err := parseArguments(flags, arguments)
 	if err != nil {
@@ -442,6 +465,18 @@ var commandHelps = []commandHelp{
 		details: installFlagsHelp,
 	},
 	{
+		name:    "remove",
+		usage:   "remove <skill>...|all [--scope user|project] [--harness <harnesses>|all] [--force]",
+		summary: "Delete managed installations and stop tracking them. all selects every managed installation in the scope.\nDirectories pa2-skills did not install are never touched.",
+		details: `Flags:
+  --scope user|project             remove from the user or from the current Git project
+                                   (default: $PA2_SKILLS_SCOPE, else user)
+  --harness <harnesses>|all        comma-separated harnesses: claude, codex, opencode; all selects every one
+                                   (default: $PA2_SKILLS_HARNESS, else all)
+  --force                          also remove installations with local changes
+`,
+	},
+	{
 		name:    "update",
 		usage:   "update [--check] [--binary-only|--skills-only] [--conflict ask|overwrite|skip]",
 		summary: "Upgrade the binary, then synchronize the source checkout and every managed installation.",
@@ -513,6 +548,7 @@ _pa2_skills() {
   commands=(
     'install:install or refresh a skill'
     'sync:fetch the source repository and refresh a skill'
+    'remove:delete managed skill installations'
     'update:update the binary, source, and managed skills'
     'version:print the installed command version'
     'list:list available skills'
@@ -543,6 +579,18 @@ _pa2_skills() {
         scope) _values 'scope' $scopes ;;
         harness) _values -s , 'harness' $harnesses ;;
         conflict) _values 'conflict policy' $conflicts ;;
+        skill) skills=(all "${(@f)$($words[1] completion values 2>/dev/null)}"); _describe -t skills skill skills ;;
+      esac
+      ;;
+    remove)
+      _arguments -s \
+        '--scope=[installation scope]:scope:->scope' \
+        '--harness=[comma-separated harnesses, or all]:harness:->harness' \
+        '--force[also remove installations with local changes]' \
+        '*:skill:->skill'
+      case $state in
+        scope) _values 'scope' $scopes ;;
+        harness) _values -s , 'harness' $harnesses ;;
         skill) skills=(all "${(@f)$($words[1] completion values 2>/dev/null)}"); _describe -t skills skill skills ;;
       esac
       ;;

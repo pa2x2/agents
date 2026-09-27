@@ -58,8 +58,12 @@ func (p Paths) InstallationsRoot() string {
 	return filepath.Join(p.StateRoot(), "installations")
 }
 
+func (p Paths) BaselinesRoot() string {
+	return filepath.Join(p.StateRoot(), "baselines")
+}
+
 func (p Paths) BaselinePath(hash string) string {
-	return filepath.Join(p.StateRoot(), "baselines", hash)
+	return filepath.Join(p.BaselinesRoot(), hash)
 }
 
 func projectStateKey(projectRoot, scope, harness, skill string) string {

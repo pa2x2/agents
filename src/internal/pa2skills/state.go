@@ -66,10 +66,12 @@ func (p Paths) writeInstallation(key string, installation Installation) error {
 	return os.Rename(temporaryName, p.InstallStatePath(key))
 }
 
-func (p Paths) installations() ([]struct {
+type storedInstallation struct {
 	Key          string
 	Installation Installation
-}, error) {
+}
+
+func (p Paths) installations() ([]storedInstallation, error) {
 	entries, err := os.ReadDir(p.InstallationsRoot())
 	if os.IsNotExist(err) {
 		return nil, nil
@@ -77,11 +79,7 @@ func (p Paths) installations() ([]struct {
 	if err != nil {
 		return nil, fmt.Errorf("read installation state: %w", err)
 	}
-	sort.Slice(entries, func(i, j int) bool { return entries[i].Name() < entries[j].Name() })
-	result := make([]struct {
-		Key          string
-		Installation Installation
-	}, 0, len(entries))
+	result := make([]storedInstallation, 0, len(entries))
 	for _, entry := range entries {
 		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
 			continue
@@ -94,11 +92,21 @@ func (p Paths) installations() ([]struct {
 		if err := json.Unmarshal(contents, &installation); err != nil {
 			return nil, fmt.Errorf("read installation state %s: %w", entry.Name(), err)
 		}
-		result = append(result, struct {
-			Key          string
-			Installation Installation
-		}{strings.TrimSuffix(entry.Name(), ".json"), installation})
+		result = append(result, storedInstallation{strings.TrimSuffix(entry.Name(), ".json"), installation})
 	}
+	sort.SliceStable(result, func(i, j int) bool {
+		left, right := result[i].Installation, result[j].Installation
+		if left.Skill != right.Skill {
+			return left.Skill < right.Skill
+		}
+		if left.Scope != right.Scope {
+			return left.Scope > right.Scope
+		}
+		if left.ProjectRoot != right.ProjectRoot {
+			return left.ProjectRoot < right.ProjectRoot
+		}
+		return left.Harness < right.Harness
+	})
 	return result, nil
 }
 
@@ -117,4 +125,39 @@ func (p Paths) saveBaseline(source string) (string, error) {
 		return "", fmt.Errorf("save baseline: %w", err)
 	}
 	return hash, nil
+}
+
+func (p Paths) removeInstallation(key string) error {
+	if err := os.Remove(p.InstallStatePath(key)); err != nil && !os.IsNotExist(err) {
+		return err
+	}
+	return nil
+}
+
+// pruneBaselines deletes baselines that no installation references.
+func (p Paths) pruneBaselines() error {
+	installations, err := p.installations()
+	if err != nil {
+		return err
+	}
+	referenced := map[string]bool{}
+	for _, stored := range installations {
+		referenced[stored.Installation.Baseline] = true
+	}
+	root := p.BaselinesRoot()
+	entries, err := os.ReadDir(root)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for _, entry := range entries {
+		if !referenced[entry.Name()] {
+			if err := os.RemoveAll(filepath.Join(root, entry.Name())); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
