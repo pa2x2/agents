@@ -231,8 +231,8 @@ func addSkill(arguments []string, manager pa2skills.Manager, stdout io.Writer) e
 
 func installOrSync(command string, arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
 	flags := newFlagSet(command)
-	scope := flags.String("scope", "", "user or project")
-	harnesses := flags.String("harness", "", "comma-separated harnesses, or all")
+	scope := flags.String("scope", environmentDefault("PA2_SKILLS_SCOPE", string(pa2skills.ScopeUser)), "user or project")
+	harnesses := flags.String("harness", environmentDefault("PA2_SKILLS_HARNESS", pa2skills.HarnessAll), "comma-separated harnesses, or all")
 	conflict := flags.String("conflict", "ask", "ask, overwrite, or skip")
 	positionals, err := parseArguments(flags, arguments)
 	if err != nil {
@@ -409,6 +409,13 @@ func requireNoArguments(command string, arguments []string) error {
 	return invalidArguments(fmt.Errorf("%s does not accept arguments: %s", command, strings.Join(arguments, ", ")))
 }
 
+func environmentDefault(name, fallback string) string {
+	if value := strings.TrimSpace(os.Getenv(name)); value != "" {
+		return value
+	}
+	return fallback
+}
+
 func splitValues(value string) []string {
 	parts := strings.Split(value, ",")
 	result := make([]string, 0, len(parts))
@@ -431,13 +438,13 @@ type commandHelp struct {
 var commandHelps = []commandHelp{
 	{
 		name:    "install",
-		usage:   "install <skill> --scope user|project --harness <harnesses>|all [--conflict ask|overwrite|skip]",
+		usage:   "install <skill> [--scope user|project] [--harness <harnesses>|all] [--conflict ask|overwrite|skip]",
 		summary: "Install a skill from the managed source checkout, or refresh an existing installation.",
 		details: installFlagsHelp,
 	},
 	{
 		name:    "sync",
-		usage:   "sync <skill> --scope user|project --harness <harnesses>|all [--conflict ask|overwrite|skip]",
+		usage:   "sync <skill> [--scope user|project] [--harness <harnesses>|all] [--conflict ask|overwrite|skip]",
 		summary: "Fetch the source repository, then install or refresh a skill.",
 		details: installFlagsHelp,
 	},
@@ -472,7 +479,9 @@ var commandHelps = []commandHelp{
 
 const installFlagsHelp = `Flags:
   --scope user|project             install for the user or for the current Git project
+                                   (default: $PA2_SKILLS_SCOPE, else user)
   --harness <harnesses>|all        comma-separated harnesses: claude, codex, opencode; all selects every one
+                                   (default: $PA2_SKILLS_HARNESS, else all)
   --conflict ask|overwrite|skip    how to resolve local changes (default: ask)
 `
 
