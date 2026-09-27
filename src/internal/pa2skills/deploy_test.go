@@ -160,3 +160,16 @@ func TestInstallAllInstallsEverySkill(t *testing.T) {
 		}
 	}
 }
+
+func TestInstallReportsCurrentInstallation(t *testing.T) {
+	manager, paths := testManager(t)
+	writeSkill(t, paths.SourceRoot, "example", "first")
+	for range 2 {
+		if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if output := manager.Stdout.(*bytes.Buffer).String(); !strings.Contains(output, "Already current: example for codex") {
+		t.Fatalf("output = %q, want an already-current report", output)
+	}
+}

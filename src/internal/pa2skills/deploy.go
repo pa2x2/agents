@@ -122,8 +122,12 @@ func (m Manager) installSkill(skill string, scope Scope, harnesses []string, pro
 			return err
 		}
 		if known {
-			if err := m.updateTarget(current, key, source, ref, activePolicy); err != nil {
+			upToDate, err := m.updateTarget(current, key, source, ref, activePolicy)
+			if err != nil {
 				return err
+			}
+			if upToDate {
+				fmt.Fprintf(m.Stdout, "Already current: %s for %s at %s\n", skill, harness, target)
 			}
 			continue
 		}
@@ -218,7 +222,7 @@ func (m Manager) UpdateAll(policy ConflictPolicy) error {
 		if err != nil {
 			return fmt.Errorf("sync %s at %s: %w", installation.Skill, installation.Target, err)
 		}
-		if err := m.updateTarget(installation, stored.Key, source, ref, &activePolicy); err != nil {
+		if _, err := m.updateTarget(installation, stored.Key, source, ref, &activePolicy); err != nil {
 			return err
 		}
 	}
@@ -246,38 +250,47 @@ func (m Manager) CheckSource() (string, error) {
 	return fmt.Sprintf("update available: %.7s -> %.7s", localRef, fields[0]), nil
 }
 
-func (m Manager) updateTarget(installation Installation, key, source, ref string, policy *ConflictPolicy) error {
+// updateTarget refreshes a managed installation and reports whether it already matched the source.
+func (m Manager) updateTarget(installation Installation, key, source, ref string, policy *ConflictPolicy) (bool, error) {
 	localHash, err := treeHash(installation.Target)
 	if err != nil {
-		return err
+		return false, err
 	}
 	sourceHash, err := treeHash(source)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if localHash == sourceHash {
-		return nil
+		return true, nil
 	}
 	if localHash == installation.Baseline {
-		return m.materialize(installationWithRef(installation, ref), key, source)
+		return false, m.materializeUpdate(installation, key, source, ref)
 	}
 	if sourceHash == installation.Baseline {
-		fmt.Fprintf(m.Stdout, "Kept locally customized %s at %s\n", installation.Skill, installation.Target)
-		return nil
+		fmt.Fprintf(m.Stdout, "Kept locally customized %s for %s at %s\n", installation.Skill, installation.Harness, installation.Target)
+		return false, nil
 	}
 	decision, err := m.resolveConflict(installation, source, *policy)
 	if err != nil {
-		return err
+		return false, err
 	}
 	if decision == ConflictAllOverwrite {
 		*policy = ConflictOverwrite
 		decision = ConflictOverwrite
 	}
 	if decision == ConflictSkip {
-		fmt.Fprintf(m.Stdout, "Skipped remote changes for %s at %s\n", installation.Skill, installation.Target)
-		return nil
+		fmt.Fprintf(m.Stdout, "Skipped remote changes for %s for %s at %s\n", installation.Skill, installation.Harness, installation.Target)
+		return false, nil
 	}
-	return m.materialize(installationWithRef(installation, ref), key, source)
+	return false, m.materializeUpdate(installation, key, source, ref)
+}
+
+func (m Manager) materializeUpdate(installation Installation, key, source, ref string) error {
+	if err := m.materialize(installationWithRef(installation, ref), key, source); err != nil {
+		return err
+	}
+	fmt.Fprintf(m.Stdout, "Updated %s for %s at %s\n", installation.Skill, installation.Harness, installation.Target)
+	return nil
 }
 
 func (m Manager) materialize(installation Installation, key, source string) error {
