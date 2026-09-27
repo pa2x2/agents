@@ -355,10 +355,10 @@ _pa2_skills() {
   local command
   local -a commands skills harnesses scopes conflicts
   commands=(
-	'install:install or refresh a skill'
-	'sync:fetch the source repository and refresh a skill'
-	'update:update the binary, source, and managed skills'
-	    'version:print the installed command version'
+    'install:install or refresh a skill'
+    'sync:fetch the source repository and refresh a skill'
+    'update:update the binary, source, and managed skills'
+    'version:print the installed command version'
     'list:list available skills'
     'discover:find skills below a directory'
     'add:copy a skill into the managed source checkout'
