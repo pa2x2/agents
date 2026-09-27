@@ -33,6 +33,10 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		return err
 	}
 	manager := pa2skills.Manager{Paths: paths, Stdin: stdin, Stdout: stdout, Stderr: stderr}
+	if help, found := lookupCommand(arguments[0]); found && hasHelpFlag(arguments[1:]) {
+		printCommandHelp(stdout, help)
+		return nil
+	}
 	switch arguments[0] {
 	case "version", "--version":
 		if err := requireNoArguments("version", arguments[1:]); err != nil {
@@ -69,14 +73,80 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		}
 		return doctor(manager, stdout)
 	case "help", "--help", "-h":
-		if err := requireNoArguments("help", arguments[1:]); err != nil {
-			return err
-		}
+		return printHelp(arguments[1:], stdout)
+	default:
+		return unknownCommand(arguments[0])
+	}
+}
+
+func printHelp(arguments []string, stdout io.Writer) error {
+	if len(arguments) > 1 {
+		return errors.New("usage: pa2-skills help [command]")
+	}
+	if len(arguments) == 0 {
 		printUsage(stdout)
 		return nil
-	default:
-		return fmt.Errorf("unknown command %q", arguments[0])
 	}
+	help, found := lookupCommand(arguments[0])
+	if !found {
+		return unknownCommand(arguments[0])
+	}
+	printCommandHelp(stdout, help)
+	return nil
+}
+
+func unknownCommand(name string) error {
+	message := fmt.Sprintf("unknown command %q", name)
+	best, bestDistance := "", 3
+	for _, help := range commandHelps {
+		if distance := editDistance(name, help.name); distance < bestDistance {
+			best, bestDistance = help.name, distance
+		}
+	}
+	if best != "" {
+		message += fmt.Sprintf("; did you mean %q?", best)
+	}
+	return errors.New(message + "\nRun 'pa2-skills help' for usage.")
+}
+
+func editDistance(left, right string) int {
+	previous := make([]int, len(right)+1)
+	for index := range previous {
+		previous[index] = index
+	}
+	for i := 1; i <= len(left); i++ {
+		current := make([]int, len(right)+1)
+		current[0] = i
+		for j := 1; j <= len(right); j++ {
+			cost := 1
+			if left[i-1] == right[j-1] {
+				cost = 0
+			}
+			current[j] = min(previous[j]+1, current[j-1]+1, previous[j-1]+cost)
+		}
+		previous = current
+	}
+	return previous[len(right)]
+}
+
+func hasHelpFlag(arguments []string) bool {
+	for _, argument := range arguments {
+		switch argument {
+		case "--":
+			return false
+		case "-h", "-help", "--help":
+			return true
+		}
+	}
+	return false
+}
+
+// newFlagSet returns a flag set whose errors are reported only through the returned error.
+func newFlagSet(name string) *flag.FlagSet {
+	flags := flag.NewFlagSet(name, flag.ContinueOnError)
+	flags.SetOutput(io.Discard)
+	flags.Usage = func() {}
+	return flags
 }
 
 func discoverSkills(arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
@@ -111,8 +181,7 @@ func addSkill(arguments []string, manager pa2skills.Manager, stdout io.Writer) e
 		source = arguments[0]
 		flagArguments = arguments[1:]
 	}
-	flags := flag.NewFlagSet("add", flag.ContinueOnError)
-	flags.SetOutput(stdout)
+	flags := newFlagSet("add")
 	name := flags.String("name", "", "tracked skill name")
 	if err := flags.Parse(flagArguments); err != nil {
 		return err
@@ -147,8 +216,7 @@ func installOrSync(command string, arguments []string, manager pa2skills.Manager
 		skill = arguments[0]
 		flagArguments = arguments[1:]
 	}
-	flags := flag.NewFlagSet(command, flag.ContinueOnError)
-	flags.SetOutput(stdout)
+	flags := newFlagSet(command)
 	scope := flags.String("scope", "", "user or project")
 	harnesses := flags.String("harness", "", "comma-separated harnesses, or all")
 	conflict := flags.String("conflict", "ask", "ask, overwrite, or skip")
@@ -174,8 +242,7 @@ func installOrSync(command string, arguments []string, manager pa2skills.Manager
 }
 
 func updateInstallation(arguments []string, manager pa2skills.Manager, stdout, stderr io.Writer) error {
-	flags := flag.NewFlagSet("update", flag.ContinueOnError)
-	flags.SetOutput(stdout)
+	flags := newFlagSet("update")
 	check := flags.Bool("check", false, "report available updates without changing files")
 	binOnly := flags.Bool("binary-only", false, "only update the pa2-skills binary")
 	skillsOnly := flags.Bool("skills-only", false, "only update the source and managed skills")
@@ -334,19 +401,86 @@ func splitValues(value string) []string {
 	return result
 }
 
+type commandHelp struct {
+	name    string
+	usage   string
+	summary string
+	details string
+}
+
+var commandHelps = []commandHelp{
+	{
+		name:    "install",
+		usage:   "install <skill> --scope user|project --harness <harnesses>|all [--conflict ask|overwrite|skip]",
+		summary: "Install a skill from the managed source checkout, or refresh an existing installation.",
+		details: installFlagsHelp,
+	},
+	{
+		name:    "sync",
+		usage:   "sync <skill> --scope user|project --harness <harnesses>|all [--conflict ask|overwrite|skip]",
+		summary: "Fetch the source repository, then install or refresh a skill.",
+		details: installFlagsHelp,
+	},
+	{
+		name:    "update",
+		usage:   "update [--check] [--binary-only|--skills-only] [--conflict ask|overwrite|skip]",
+		summary: "Upgrade the binary, then synchronize the source checkout and every managed installation.",
+		details: `Flags:
+  --check                          report available updates without changing files
+  --binary-only                    only update the pa2-skills binary
+  --skills-only                    only update the source checkout and managed skills
+  --conflict ask|overwrite|skip    how to resolve skills with local and remote changes (default: ask)
+`,
+	},
+	{name: "list", usage: "list", summary: "List skills available from the managed source checkout."},
+	{name: "discover", usage: "discover [path]", summary: "Report skills found below the current or supplied directory."},
+	{
+		name:    "add",
+		usage:   "add <skill-path> [--name <name>]",
+		summary: "Copy a local skill into the managed source checkout without Git operations.",
+		details: `Flags:
+  --name <name>    tracked skill name (default: the directory name)
+`,
+	},
+	{name: "version", usage: "version", summary: "Print the installed command version."},
+	{name: "source-path", usage: "source-path", summary: "Print the managed source checkout path."},
+	{name: "cd", usage: "cd [path]", summary: "Launch a child shell in the managed source checkout or one of its paths."},
+	{name: "completion", usage: "completion zsh", summary: "Print dynamic Zsh completion."},
+	{name: "doctor", usage: "doctor", summary: "Check the managed source checkout and local prerequisites."},
+	{name: "help", usage: "help [command]", summary: "Show usage for all commands or one command."},
+}
+
+const installFlagsHelp = `Flags:
+  --scope user|project             install for the user or for the current Git project
+  --harness <harnesses>|all        comma-separated harnesses: claude, codex, opencode; all selects every one
+  --conflict ask|overwrite|skip    how to resolve local changes (default: ask)
+`
+
+func lookupCommand(name string) (commandHelp, bool) {
+	if name == "--version" {
+		name = "version"
+	}
+	for _, help := range commandHelps {
+		if help.name == name {
+			return help, true
+		}
+	}
+	return commandHelp{}, false
+}
+
 func printUsage(writer io.Writer) {
-	fmt.Fprint(writer, `Usage:
-  pa2-skills install <skill> --scope user|project --harness codex,claude|all [--conflict ask|overwrite|skip]
-  pa2-skills sync <skill> --scope user|project --harness codex,claude|all [--conflict ask|overwrite|skip]
-  pa2-skills update [--check] [--binary-only|--skills-only] [--conflict ask|overwrite|skip]
-  pa2-skills list
-  pa2-skills discover [path]
-  pa2-skills add <skill-path> [--name <name>]
-  pa2-skills source-path
-  pa2-skills cd [path]
-  pa2-skills completion zsh
-  pa2-skills doctor
-`)
+	fmt.Fprintln(writer, "Usage:")
+	for _, help := range commandHelps {
+		fmt.Fprintf(writer, "  pa2-skills %s\n", help.usage)
+	}
+	fmt.Fprintln(writer, "\nRun 'pa2-skills help <command>' for details.")
+}
+
+func printCommandHelp(writer io.Writer, help commandHelp) {
+	fmt.Fprintf(writer, "Usage: pa2-skills %s\n\n%s\n", help.usage, help.summary)
+	if help.details != "" {
+		fmt.Fprintf(writer, "\n%s", help.details)
+	}
 }
 
 const zshCompletion = `#compdef pa2-skills
@@ -366,6 +500,7 @@ _pa2_skills() {
     'cd:open a shell in the managed source checkout'
     'completion:generate shell completion'
     'doctor:check the local installation'
+    'help:show usage for a command'
   )
   harnesses=(all claude codex opencode)
   scopes=(user project)
@@ -409,6 +544,9 @@ _pa2_skills() {
       ;;
     completion)
       _values 'format' zsh values
+      ;;
+    help)
+      _describe -t commands command commands
       ;;
     cd)
       _files -/
