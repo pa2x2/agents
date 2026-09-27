@@ -141,6 +141,27 @@ func hasHelpFlag(arguments []string) bool {
 	return false
 }
 
+// parseArguments parses flags that may appear before, between, or after positional arguments.
+// Arguments after a literal "--" are always positional.
+func parseArguments(flags *flag.FlagSet, arguments []string) ([]string, error) {
+	var positionals []string
+	for {
+		if err := flags.Parse(arguments); err != nil {
+			return nil, fmt.Errorf("%w\nRun 'pa2-skills help %s' for usage.", err, flags.Name())
+		}
+		remaining := flags.Args()
+		consumed := len(arguments) - len(remaining)
+		if consumed > 0 && arguments[consumed-1] == "--" {
+			return append(positionals, remaining...), nil
+		}
+		if len(remaining) == 0 {
+			return positionals, nil
+		}
+		positionals = append(positionals, remaining[0])
+		arguments = remaining[1:]
+	}
+}
+
 // newFlagSet returns a flag set whose errors are reported only through the returned error.
 func newFlagSet(name string) *flag.FlagSet {
 	flags := flag.NewFlagSet(name, flag.ContinueOnError)
@@ -175,16 +196,15 @@ func discoverSkills(arguments []string, manager pa2skills.Manager, stdout io.Wri
 }
 
 func addSkill(arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
-	source := ""
-	flagArguments := arguments
-	if len(arguments) > 0 && !strings.HasPrefix(arguments[0], "-") {
-		source = arguments[0]
-		flagArguments = arguments[1:]
-	}
 	flags := newFlagSet("add")
 	name := flags.String("name", "", "tracked skill name")
-	if err := flags.Parse(flagArguments); err != nil {
+	positionals, err := parseArguments(flags, arguments)
+	if err != nil {
 		return err
+	}
+	source := ""
+	if len(positionals) > 0 {
+		source = positionals[0]
 	}
 	var validationErrors []error
 	if source == "" {
@@ -195,8 +215,8 @@ func addSkill(arguments []string, manager pa2skills.Manager, stdout io.Writer) e
 			validationErrors = append(validationErrors, err)
 		}
 	}
-	if flags.NArg() != 0 {
-		validationErrors = append(validationErrors, fmt.Errorf("unexpected argument(s): %s", strings.Join(flags.Args(), ", ")))
+	if len(positionals) > 1 {
+		validationErrors = append(validationErrors, fmt.Errorf("unexpected argument(s): %s", strings.Join(positionals[1:], ", ")))
 	}
 	if err := invalidArguments(validationErrors...); err != nil {
 		return err
@@ -210,22 +230,21 @@ func addSkill(arguments []string, manager pa2skills.Manager, stdout io.Writer) e
 }
 
 func installOrSync(command string, arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
-	skill := ""
-	flagArguments := arguments
-	if len(arguments) > 0 && !strings.HasPrefix(arguments[0], "-") {
-		skill = arguments[0]
-		flagArguments = arguments[1:]
-	}
 	flags := newFlagSet(command)
 	scope := flags.String("scope", "", "user or project")
 	harnesses := flags.String("harness", "", "comma-separated harnesses, or all")
 	conflict := flags.String("conflict", "ask", "ask, overwrite, or skip")
-	if err := flags.Parse(flagArguments); err != nil {
+	positionals, err := parseArguments(flags, arguments)
+	if err != nil {
 		return err
 	}
+	skill := ""
+	if len(positionals) > 0 {
+		skill = positionals[0]
+	}
 	var validationErrors []error
-	if flags.NArg() != 0 {
-		validationErrors = append(validationErrors, fmt.Errorf("unexpected argument(s): %s", strings.Join(flags.Args(), ", ")))
+	if len(positionals) > 1 {
+		validationErrors = append(validationErrors, fmt.Errorf("unexpected argument(s): %s", strings.Join(positionals[1:], ", ")))
 	}
 	policy := pa2skills.ConflictPolicy(*conflict)
 	selectedHarnesses := pa2skills.ExpandHarnesses(splitValues(*harnesses))
@@ -247,12 +266,13 @@ func updateInstallation(arguments []string, manager pa2skills.Manager, stdout, s
 	binOnly := flags.Bool("binary-only", false, "only update the pa2-skills binary")
 	skillsOnly := flags.Bool("skills-only", false, "only update the source and managed skills")
 	conflict := flags.String("conflict", "ask", "ask, overwrite, or skip")
-	if err := flags.Parse(arguments); err != nil {
+	positionals, err := parseArguments(flags, arguments)
+	if err != nil {
 		return err
 	}
 	var validationErrors []error
-	if flags.NArg() != 0 {
-		validationErrors = append(validationErrors, fmt.Errorf("unexpected argument(s): %s", strings.Join(flags.Args(), ", ")))
+	if len(positionals) != 0 {
+		validationErrors = append(validationErrors, fmt.Errorf("unexpected argument(s): %s", strings.Join(positionals, ", ")))
 	}
 	if *binOnly && *skillsOnly {
 		validationErrors = append(validationErrors, errors.New("--binary-only and --skills-only cannot be used together"))
