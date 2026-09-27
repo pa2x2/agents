@@ -12,9 +12,9 @@ Ensure `~/.local/bin` is on `PATH` if needed, then inspect the available skills:
 
 | Command | Purpose |
 |---|---|
-| `pa2-skills install <skill>...\|all [--scope user\|project] [--harness <harnesses>]` | Install skills (`all` selects every available skill) for the selected scope and comma-separated harnesses (`all` selects every supported harness). Scope defaults to `$PA2_SKILLS_SCOPE` or `user`; harnesses default to `$PA2_SKILLS_HARNESS` or `all`. |
-| `pa2-skills sync <skill>...\|all [--scope user\|project] [--harness <harnesses>]` | Fetch the source repository, then install or refresh skills. |
-| `pa2-skills remove <skill>...\|all [--scope user\|project] [--harness <harnesses>] [--force]` | Delete managed installations and stop tracking them; locally customized ones need `--force`. |
+| `pa2-skills install <skill>...\|all [--scope user\|project] --harness <harnesses>` | Install skills (`all` selects every available skill) for the selected scope and comma-separated harnesses (`all` selects every supported harness). Scope defaults to `$PA2_SKILLS_SCOPE` or `user`; `--harness` may be omitted when `$PA2_SKILLS_HARNESS` is set. |
+| `pa2-skills sync <skill>...\|all [--scope user\|project] --harness <harnesses>` | Fetch the source repository, then install or refresh skills. |
+| `pa2-skills remove <skill>...\|all [--scope user\|project] --harness <harnesses> [--force]` | Delete managed installations and stop tracking them; locally customized ones need `--force`. |
 | `pa2-skills update` | Upgrade the binary and synchronize the source and all managed skill installations. |
 | `pa2-skills list` | List skills available from the managed source checkout. |
 | `pa2-skills status [skill...]` | Show managed installations and whether each is current, outdated, locally modified, diverged, missing, or orphaned. |

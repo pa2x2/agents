@@ -237,7 +237,7 @@ func addSkill(arguments []string, manager pa2skills.Manager, stdout io.Writer) e
 // targetFlags registers the --scope and --harness flags shared by commands that select installations.
 func targetFlags(flags *flag.FlagSet) (*string, *string) {
 	scope := flags.String("scope", environmentDefault("PA2_SKILLS_SCOPE", string(pa2skills.ScopeUser)), "user or project")
-	harnesses := flags.String("harness", environmentDefault("PA2_SKILLS_HARNESS", pa2skills.HarnessAll), "comma-separated harnesses, or all")
+	harnesses := flags.String("harness", environmentDefault("PA2_SKILLS_HARNESS", ""), "comma-separated harnesses, or all")
 	return scope, harnesses
 }
 
@@ -480,25 +480,25 @@ type commandHelp struct {
 var commandHelps = []commandHelp{
 	{
 		name:    "install",
-		usage:   "install <skill>...|all [--scope user|project] [--harness <harnesses>|all] [--conflict ask|overwrite|skip]",
+		usage:   "install <skill>...|all [--scope user|project] --harness <harnesses>|all [--conflict ask|overwrite|skip]",
 		summary: "Install skills from the managed source checkout, or refresh existing installations. all selects every available skill.",
 		details: installFlagsHelp,
 	},
 	{
 		name:    "sync",
-		usage:   "sync <skill>...|all [--scope user|project] [--harness <harnesses>|all] [--conflict ask|overwrite|skip]",
+		usage:   "sync <skill>...|all [--scope user|project] --harness <harnesses>|all [--conflict ask|overwrite|skip]",
 		summary: "Fetch the source repository, then install or refresh skills. all selects every available skill.",
 		details: installFlagsHelp,
 	},
 	{
 		name:    "remove",
-		usage:   "remove <skill>...|all [--scope user|project] [--harness <harnesses>|all] [--force]",
+		usage:   "remove <skill>...|all [--scope user|project] --harness <harnesses>|all [--force]",
 		summary: "Delete managed installations and stop tracking them. all selects every managed installation in the scope.\nDirectories pa2-skills did not install are never touched.",
 		details: `Flags:
   --scope user|project             remove from the user or from the current Git project
                                    (default: $PA2_SKILLS_SCOPE, else user)
   --harness <harnesses>|all        comma-separated harnesses: claude, codex, opencode; all selects every one
-                                   (default: $PA2_SKILLS_HARNESS, else all)
+                                   (default: $PA2_SKILLS_HARNESS; required when it is unset)
   --force                          also remove installations with local changes
 `,
 	},
@@ -550,7 +550,7 @@ const installFlagsHelp = `Flags:
   --scope user|project             install for the user or for the current Git project
                                    (default: $PA2_SKILLS_SCOPE, else user)
   --harness <harnesses>|all        comma-separated harnesses: claude, codex, opencode; all selects every one
-                                   (default: $PA2_SKILLS_HARNESS, else all)
+                                   (default: $PA2_SKILLS_HARNESS; required when it is unset)
   --conflict ask|overwrite|skip    how to resolve local changes (default: ask)
 `
 
