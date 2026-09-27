@@ -25,6 +25,7 @@ Ensure `~/.local/bin` is on `PATH` if needed, then inspect the available skills:
 | `pa2-skills cd [path]` | Launch a child shell in the managed source checkout or one of its paths. |
 | `pa2-skills completion zsh` | Print dynamic Zsh completion. |
 | `pa2-skills doctor` | Check the managed source checkout and local prerequisites. |
+| `pa2-skills help [command]` | Show usage for all commands, or flags and details for one command (same as `<command> --help`). |
 
 ## Zsh completion
 
