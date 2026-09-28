@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="icon" href="data:," />
-<title>Proposals</title>
+<title>Decisions</title>
 <style>
 :root {
   --page: #eceef1; --page-card: #ffffff; --page-text: #16181d; --page-muted: #5d6470; --accent: #16181d; --hl: #f59e0b;
@@ -157,9 +157,9 @@ const shot = (kind, caption, html, when = null) =>
 
 // ========== EDIT: deck content ==========
 const DECK = {
-  title: "Project — proposals",
+  title: "Project — decisions",
   // Answers persist in localStorage under this key. Use a new key per deck.
-  storageKey: "project-proposals-v1",
+  storageKey: "project-decisions-v1",
   // Extra intro paragraph (HTML): suggested order, caveats such as "drawn, not screenshots".
   intro: "Nothing has been changed yet.",
   // Hue (0-360) per kind, used for the badge colour.
@@ -230,7 +230,7 @@ let html = `<section class="slide page" data-key="intro">
   <h1>${DECK.title}</h1>
   <p class="lead">Each slide shows <b>how it is now</b> next to the <b>proposed</b> version.
   Parts marked with a <span class="legend">dashed outline</span> are what changes.<br/><br/>
-  For each proposal pick <b>Keep</b>, <b>Change</b> or <b>Drop</b>, choose a variant where there is one, and add notes. Answers are saved in this browser.
+  For each slide pick <b>Keep</b>, <b>Change</b> or <b>Drop</b>, choose a variant where there is one, and add notes. Answers are saved in this browser.
   The last slide collects everything, ready to copy and paste back into the chat. Use <kbd>←</kbd> <kbd>→</kbd> to move between slides.<br/><br/>
   ${DECK.intro}</p>
   <div class="toc" id="toc"></div></section>`;
