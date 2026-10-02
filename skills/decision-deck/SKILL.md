@@ -19,16 +19,23 @@ Each slide is one decision: a proposed change, a finding to act on, or a questio
 
 Group related findings into one slide. Put small, self-explanatory fixes in the `SMALL` list, which all share one slide and are decided one by one.
 
+Word every slide and small fix as a change to make, so Keep means "do it" and Drop means "don't". An item that says what won't happen ("No new tests", "Debug builds have no updater") turns Drop into a double negative. Implementation details like that belong in the plan, not the deck; if one needs a decision, word it as the action ("Leave the updater out of debug builds").
+
 ## 2. Create the deck
 
 1. Create a workspace for the decisions with the `create-agent-workspace` skill and put the deck in a `deck/` directory inside it. If that skill isn't available, or the deck is a throwaway (a test run, a one-off the user won't keep), put everything in a new directory under `/tmp` instead (`mktemp -d /tmp/<slug>-deck-XXXX`). Never write the deck into the project tree.
 2. Copy [assets/deck.html](assets/deck.html) there as `index.html`. Only the two sections marked `EDIT` need changes: visual styles and deck content (`DECK`, `P`, `SMALL`). The deck itself keeps its neutral look. Delete the example slides. Set a new `DECK.storageKey` so answers from another deck don't load.
 3. Draw each shot in the form that shows the change best. `shot()` takes any HTML:
    - **UI changes**: a mockup of the screen or component. Make it look like the real UI: its colours, fonts and components from the project's styles, its real labels and copy, and its own assets (icon fonts, SVGs, images) copied next to `index.html` rather than redrawn. An icon font needs each glyph's code point, which is usually in a glyph map (JSON) shipped with the font's package. Draw the app's default theme; show the other theme too only when the change looks different in it. Use realistic sample content. If you can capture real screenshots of the current state, you may use them as `<img>` in the "Now" shots.
+   - **Fonts**: the browser may not have a platform font the app uses, such as Roboto on Android or SF Pro on Apple platforms, and silently falls back to another face. Copy the font file next to `index.html` (from the project, its dependencies, or a device or emulator: `adb pull /system/fonts/Roboto-Regular.ttf`) and load it with `@font-face`. End every font stack with a generic family (`sans-serif`).
    - **Anything else**: a diagram of the flow or structure, before/after code or config, a table, sample output. Plain HTML and CSS is enough.
+
+   Keep a slide to about three visuals side by side. The deck shrinks the visuals to fit, so more makes them too small to read. Show several states of one screen as a grid inside one visual, or split the slide.
 4. Wrap each changed part of a Proposed shot in `hl(tag, html, cls, style)`, so a dashed outline and a short tag ("new", "renamed", "appears on edit") mark what changes. Leave "Now" shots unmarked. By default `hl` is a block `<div>`. Two classes change that:
    - `inline`: an inline-block `<span>`, for a label inside a row or a value in a table cell.
    - `abs`: for an overlay, popover or dialog. The wrapper becomes the absolutely positioned box, so pass its position (`top`, `right`, ...) in `style` and give the inner element `position: static`.
+
+   The tag sits above the outline's top-right corner, outside the wrapped element. An ancestor with `overflow: hidden`, such as a phone frame or a rounded card, clips it, and outlines close together overlap their tags. Leave room above each outline, or put the `overflow: hidden` inside the wrapped part.
 5. Use `DECK.intro` for the suggested order to go through the slides and for caveats, such as UI mockups being drawn rather than captured.
 
 ## 3. Check it renders
@@ -36,21 +43,22 @@ Group related findings into one slide. Put small, self-explanatory fixes in the 
 Serve the directory and look at every slide before handing it over.
 
 1. Pick a free port (check with `ss -ltn`; a stale server may already hold a common one) and run `python3 -m http.server <port> --bind 127.0.0.1` in the background from the deck directory.
-2. Open it in whatever browser preview or screenshot tool you have. Wait for `document.fonts.ready` before judging fonts and icons.
-3. Step through each slide (set `location.hash = "#N"`, press → or click `.dots [data-go="N"]`) and fix what looks wrong: misaligned or cramped visuals, truncated text, overlays stretched full width or misplaced (see `abs` above), and visual class names colliding with deck classes (prefix them with `v-`). On slides with variants, select each option once to check its visual.
+2. Open it in whatever browser preview or screenshot tool you have, at the size it opens. Don't resize the preview or change its viewport. The deck fits its visuals to the window by itself, and resizing has made previews stop responding. If a preview call fails, open the page in it again (visibly, if the tool can show or hide it) and retry once before deciding it doesn't work. Wait for `document.fonts.ready` before judging fonts and icons.
+
+   If no preview works, run [scripts/render.mjs](scripts/render.mjs): `node <this skill's directory>/scripts/render.mjs <deck URL> <out dir>`. It screenshots every slide, and every option of every variant, in a headless Chromium-family browser. For each slide it prints how far the visuals were scaled down, and it lists any page errors. Read the screenshots to check them. Its header explains how to pass your own steps, for example to test the controls.
+3. Step through each slide (set `location.hash = "#N"`, press → or click `.dots [data-go="N"]`) and fix what looks wrong: misaligned or cramped visuals, truncated text, clipped highlight tags, overlays stretched full width or misplaced (see `abs` above), and visual class names colliding with deck classes (prefix them with `v-`). Visuals scaled below about 70% are too crowded. On slides with variants, select each option once to check its visual. A red "Deck error" bar instead of slides means the deck script has an error at the line it names.
 4. Test the controls once: arrow keys move slides, a decision colours its dot, and the summary slide lists the answers. Clear the test answers from `localStorage` afterwards.
 
-If you have no way to render the page, say so when you hand it over.
+If you checked it headless, or have no way to render the page at all, say so when you hand it over.
 
 ## 4. Hand it over
 
-Give the user the URL and open it in their preview if you can. In a few lines, explain:
+Give the user the URL and open it in their preview if you can. Keep the message short, about five lines. The deck is where the proposals are, and its intro lists every slide, so don't list, summarise or tabulate the slides in chat. Say:
 
-- ← and → or the dots move between slides; the intro lists every slide.
-- Each slide has Keep / Change / Drop, variant choices (picking one shows its visual), and a notes box. Answers are saved in the browser.
-- "Highlight changes" turns the dashed outlines off.
-- The last slide ("Export decisions") has the text to copy and paste back.
-- Where the deck lives, that nothing in the project has changed yet, and that the local server is still running.
+- How many slides there are.
+- Anything the user needs to know before reviewing that the slides don't make clear, such as mockups being drawn rather than captured, made-up sample data, or a bug you reproduced while investigating. If there's nothing, skip this.
+- In one line: ← and → move between slides, each slide is decided with Keep / Change / Drop, variants and notes, and the last slide exports the answers to paste back.
+- Where the deck lives, that nothing in the project has changed yet, and that the local server is still running. If you couldn't open it in their preview, say so and that you checked it headless.
 
 Keep the server running while the user reviews. Stop it when they're done, or when you finish the follow-up work.
 
@@ -60,7 +68,11 @@ The pasted export records the user's decisions. It is not permission to implemen
 
 - **KEEP**: the user accepts the slide's proposal as shown, with the chosen variant.
 - **CHANGE**: the user accepts it with the changes in their note. If the note is missing or leaves anything unclear, ask about that slide.
-- **DROP**: rejected. Don't implement it and don't propose it again.
-- **UNDECIDED**: still open. Ask about it. A variant listed under it is one the user picked; untouched variants are left out.
+- **DROP**: rejected. Don't implement it and don't propose it again. A note on it may say what to do instead ("use the icon the app already has"); treat that as the decision, and ask if it's unclear.
+- **UNDECIDED**: still open. Ask about it.
+
+Under DROP and UNDECIDED, a listed variant is one the user picked; untouched variants are left out.
 
 Reply in chat with what you understood: the accepted items with their variants and notes, the dropped ones, and your questions about unclear notes and undecided items. Check that each accepted item is actually possible (for example, that a dependency or API it relies on supports it) and say which ones aren't. Then stop. Make no changes to the project until the user explicitly tells you to implement.
+
+When notes ask to see something again or for other options ("try again", "show it with more rows"), or the user asks for another pass, answer with the deck, not with options in chat. Add the new slides or variants to the same deck, keeping slide ids unchanged so earlier answers stay. Or build a follow-up deck next to it (for example `round2.html`) that reuses its styles and assets, has a new `storageKey`, and holds only the reopened and new items. Check it renders and hand it over as above.

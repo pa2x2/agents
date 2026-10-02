@@ -96,7 +96,7 @@ textarea.note.want::placeholder { color: #a86a00; }
 .smalls { margin-top: 20px; display: flex; flex-direction: column; gap: 14px; max-width: 960px; }
 .small { display: grid; grid-template-columns: 1fr auto; gap: 10px 22px; padding: 16px 18px; border-radius: 16px; background: var(--page-card); }
 .small p { margin: 0; font-size: 14.5px; line-height: 1.5; }
-.small p b { display: block; font-size: 15.5px; margin-bottom: 3px; }
+.small p .stitle { display: block; font-weight: 700; font-size: 15.5px; margin-bottom: 3px; }
 .small textarea { grid-column: 1 / -1; min-height: 44px; }
 .summary textarea { width: 100%; height: 48vh; font-family: ui-monospace, monospace; font-size: 13px; border-radius: 14px; padding: 14px;
   background: var(--page-card); color: var(--page-text); border: 1px solid color-mix(in srgb, var(--page-muted) 30%, transparent); margin-top: 18px; }
@@ -107,13 +107,18 @@ textarea.note.want::placeholder { color: #a86a00; }
    .hl is a block wrapper with position: relative for its tag.
    - "inline": wraps in an inline-block span instead, for a label in a row or a value in a table cell.
    - "abs": for an overlay, popover or dialog. The wrapper becomes the absolutely positioned box, so put
-     the position (top/right/...) in hl()'s style argument and give the inner element position: static. */
+     the position (top/right/...) in hl()'s style argument and give the inner element position: static.
+     Its z-index keeps it above a scrim drawn after it.
+   The tag sits above the outline's top-right corner, outside the box: an ancestor with overflow: hidden
+   clips it, and outlines close together overlap their tags. */
 .hl { position: relative; outline: 2px dashed var(--hl); outline-offset: 3px; border-radius: 12px; }
 .hl.inline { display: inline-block; vertical-align: middle; }
-.hl.abs { position: absolute; }
+.hl.abs { position: absolute; z-index: 30; }
 .hl[data-tag]::after { content: attr(data-tag); position: absolute; top: -13px; right: -4px; background: var(--hl); color: #1a1200;
   font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; z-index: 40; white-space: nowrap; font-family: Helvetica, Arial, sans-serif; }
 body.nohl .hl { outline: none; } body.nohl .hl::after { display: none; }
+.deck-error { position: fixed; top: 64px; left: 24px; right: 24px; z-index: 100; margin: 0; padding: 12px 16px; border-radius: 12px;
+  background: #c62b27; color: #fff; font-size: 13px; white-space: pre-wrap; }
 
 /* ========== EDIT: visual styles ==========
    Styles for what the slides show. A visual of an existing UI should look like that UI: take its
@@ -143,6 +148,16 @@ body.nohl .hl { outline: none; } body.nohl .hl::after { display: none; }
   <button class="btn ghost" id="nextBtn">Next →</button>
 </div>
 <div class="hintkeys"><kbd>←</kbd> <kbd>→</kbd> to navigate</div>
+<script>
+// A syntax error in the deck script below stops it before anything renders. This separate script
+// still runs, so the error shows on the page instead of a blank deck.
+window.addEventListener("error", (e) => {
+  const bar = document.createElement("pre");
+  bar.className = "deck-error";
+  bar.textContent = `Deck error: ${e.message}${e.lineno ? ` (index.html line ${e.lineno})` : ""}`;
+  document.body.append(bar);
+});
+</script>
 <script>
 // ---------- helpers ----------
 const hl = (tag, html, cls = "", style = "") => {
@@ -250,12 +265,12 @@ for (const p of P) {
 
 if (SMALL.length) {
   html += `<section class="slide page" data-key="small"><header style="display:flex;gap:12px;align-items:center"><span class="num">${smallN}</span><h1 style="margin:0;font-size:26px">Small fixes</h1></header>
-    <div class="smalls">${SMALL.map((s) => `<div class="small"><p><b>${s.title}</b>${s.text}</p><div>${decisionSeg(s.id)}</div>
+    <div class="smalls">${SMALL.map((s) => `<div class="small"><p><span class="stitle">${s.title}</span>${s.text}</p><div>${decisionSeg(s.id)}</div>
     <textarea class="note" data-id="${s.id}" data-f="note" placeholder="Notes"></textarea></div>`).join("")}</div></section>`;
 }
 
 html += `<section class="slide page summary" data-key="summary"><h1>Your decisions</h1>
-  <p class="lead">Copy this and paste it back into the chat. Anything left undecided is listed as UNDECIDED.</p>
+  <p class="lead">Copy this and paste it back into the chat. Anything left undecided is listed as UNDECIDED. On undecided and dropped slides, only variants you picked are listed.</p>
   <textarea id="exportText" readonly></textarea>
   <div class="row"><button class="btn" id="copyBtn">Copy</button><span id="copied"></span></div></section>`;
 document.getElementById("deck").innerHTML = html;
@@ -307,8 +322,8 @@ function exportText() {
   for (const p of P) {
     lines.push(`${p.n}. ${p.title}: ${decisionOf(p.id).toUpperCase()}`);
     for (const v of p.variants) {
-      // An untouched variant on an undecided proposal is only the preselection, not a choice.
-      if (decisionOf(p.id) === "undecided" && state[p.id]?.[v.key] === undefined) continue;
+      // An untouched variant on an undecided or dropped proposal is only the preselection, not a choice.
+      if (["undecided", "drop"].includes(decisionOf(p.id)) && state[p.id]?.[v.key] === undefined) continue;
       const val = selectedOption(p, v);
       lines.push(`   ${v.q.replace(/[?:]$/, "")}: ${v.options.find((o) => o[0] === val)[1]}`);
     }
