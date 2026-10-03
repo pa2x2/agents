@@ -97,6 +97,8 @@ textarea.dk-note.dk-want::placeholder { color: #a86a00; }
 .dk-small p { margin: 0; font-size: 14.5px; line-height: 1.5; }
 .dk-small p .dk-stitle { display: block; font-weight: 700; font-size: 15.5px; margin-bottom: 3px; }
 .dk-small textarea { grid-column: 1 / -1; min-height: 44px; }
+.dk-small.dk-checked { grid-template-columns: 1fr; }
+.dk-state.dk-noted { color: #a86a00; }
 .dk-summary textarea { width: 100%; height: 34vh; font-family: ui-monospace, monospace; font-size: 13px; border-radius: 14px; padding: 14px;
   background: var(--page-card); color: var(--page-text); border: 1px solid color-mix(in srgb, var(--page-muted) 30%, transparent); margin-top: 18px; }
 .dk-summary .dk-row { display: flex; gap: 12px; align-items: center; margin-top: 12px; }
@@ -174,13 +176,17 @@ const save = () => localStorage.setItem(KEY, JSON.stringify(state));
 const decisionOf = (id) => state[id]?.decision ?? "undecided";
 const kindBadge = (k) => `<span class="dk-kind" style="--h:${DECK.kinds[k]?.hue ?? 220}">${DECK.kinds[k]?.label ?? k}</span>`;
 P.forEach((p, i) => { p.n = i + 1; });
+// CHECKED is optional, so a follow-up deck can leave it out.
+const checked = typeof CHECKED === "undefined" ? [] : CHECKED;
 const smallN = P.length + 1;
+const checkedN = P.length + (SMALL.length ? 1 : 0) + 1;
 
 const decisionSeg = (id) => `<div class="dk-seg">${["keep", "change", "drop"].map((v) =>
   `<input type="radio" name="${id}-d" id="${id}-${v}" value="${v}" data-id="${id}" data-f="decision"><label for="${id}-${v}">${v[0].toUpperCase() + v.slice(1)}</label>`).join("")}</div>`;
 
 const slides = [...P.map((p) => ({ key: p.id, label: String(p.n), p })),
-  ...(SMALL.length ? [{ key: "small", label: String(smallN) }] : []), { key: "summary", label: "✓" }];
+  ...(SMALL.length ? [{ key: "small", label: String(smallN) }] : []),
+  ...(checked.length ? [{ key: "checked", label: String(checkedN) }] : []), { key: "summary", label: "✓" }];
 
 document.title = DECK.title;
 document.getElementById("deckTitle").textContent = DECK.title;
@@ -204,6 +210,13 @@ if (SMALL.length) {
   html += `<section class="dk-slide dk-page" data-key="small"><header style="display:flex;gap:12px;align-items:center"><span class="dk-num">${smallN}</span><h1 style="margin:0;font-size:26px">Small fixes</h1></header>
     <div class="dk-smalls">${SMALL.map((s) => `<div class="dk-small"><p><span class="dk-stitle">${s.title}</span>${s.text}</p><div>${decisionSeg(s.id)}</div>
     <textarea class="dk-note" data-id="${s.id}" data-f="note" placeholder="Notes"></textarea></div>`).join("")}</div></section>`;
+}
+
+if (checked.length) {
+  html += `<section class="dk-slide dk-page" data-key="checked"><header style="display:flex;gap:12px;align-items:center"><span class="dk-num">${checkedN}</span><h1 style="margin:0;font-size:26px">Checked, no change proposed</h1></header>
+    <p class="dk-lead">Looked at while preparing this deck and left as it is, for the reason given. Add a note to anything you'd change anyway.</p>
+    <div class="dk-smalls">${checked.map((c) => `<div class="dk-small dk-checked"><p><span class="dk-stitle">${c.title}</span>${c.why}</p>
+    <textarea class="dk-note" data-id="${c.id}" data-f="note" placeholder="Notes"></textarea></div>`).join("")}</div></section>`;
 }
 
 html += `<section class="dk-slide dk-page dk-summary" data-key="summary"><h1>Your decisions</h1>
@@ -272,6 +285,10 @@ function exportText() {
     lines.push(`   - ${s.title}: ${decisionOf(s.id).toUpperCase()}`);
     if (note(s.id)) lines.push(`     Note: ${note(s.id).replace(/\n/g, "\n           ")}`);
   }
+  // A checked item has nothing to decide; only the ones the user wrote a note on are listed.
+  const noted = checked.filter((c) => note(c.id));
+  if (noted.length) lines.push(`${checkedN}. Checked, no change proposed`);
+  for (const c of noted) lines.push(`   - ${c.title}\n     Note: ${note(c.id).replace(/\n/g, "\n           ")}`);
   return lines.join("\n");
 }
 
@@ -295,6 +312,7 @@ function renderNav() {
     `<button class="${i === current ? "dk-on" : ""} dk-${slideDecision(s)}" data-go="${i + 1}" title="${s.p ? s.p.title : s.key}">${s.label}</button>`).join("");
   const rows = P.map((p) => [p.n, p.title, kindBadge(p.kind), decisionOf(p.id)]);
   if (SMALL.length) rows.push([smallN, "Small fixes", "", slideDecision(slides[smallN - 1])]);
+  if (checked.length) rows.push([checkedN, "Checked, no change proposed", "", checked.some((c) => state[c.id]?.note?.trim()) ? "noted" : ""]);
   document.getElementById("toc").innerHTML = rows.map(([n, t, badge, d]) =>
     `<button data-toc="${n}"><span class="dk-num">${n}</span>${t}<span style="margin-left:auto">${badge}</span><span class="dk-state dk-${d}">${d}</span></button>`).join("");
 }

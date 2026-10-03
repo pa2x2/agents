@@ -1,5 +1,5 @@
-// The deck content: DECK, the slides (P) and the small fixes (SMALL). shot() and hl() come from
-// index.html, and the helpers in visuals.js are available too.
+// The deck content: DECK, the slides (P), the small fixes (SMALL) and what was checked but needs no
+// change (CHECKED). shot() and hl() come from index.html, and the helpers in visuals.js are available too.
 const DECK = {
   title: "Project — decisions",
   // Answers persist in localStorage under this key. Use a new key per deck.
@@ -48,4 +48,10 @@ const P = [
 // Small, self-explanatory fixes on one slide, each decided separately. Leave empty to hide the slide.
 const SMALL = [
   { id: "s1", title: "Example small fix", text: "One or two sentences on the problem and the fix. (file.ts)" },
+];
+
+// What you looked at and would leave as it is, each with a one-line reason. The user can add a note
+// to anything they'd change anyway. Leave empty to hide the slide.
+const CHECKED = [
+  { id: "c1", title: "Example: the editor's autosave interval", why: "Every 10 seconds already; nobody reported losing text. (src/screens/Editor.tsx)" },
 ];
