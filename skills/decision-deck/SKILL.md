@@ -27,7 +27,7 @@ Word every slide and small fix as a change to make, so Keep means "do it" and Dr
 
 ## 2. Create the deck
 
-1. Create a workspace for the decisions with the `create-agent-workspace` skill and put the deck in a `deck/` directory inside it. If that skill isn't available, or the deck is a throwaway (a test run, a one-off the user won't keep), put everything in a new directory under `/tmp` instead (`mktemp -d /tmp/<slug>-deck-XXXX`). Never write the deck into the project tree.
+1. Create a workspace for the decisions with the `create-agent-workspace` skill and put the deck in a `deck/` directory inside it. Create it and copy its templates now, but fill in its documents after the hand-over, so the deck reaches the user sooner. If that skill isn't available, or the deck is a throwaway (a test run, a one-off the user won't keep), put everything in a new directory under `/tmp` instead (`mktemp -d /tmp/<slug>-deck-XXXX`). Never write the deck into the project tree.
 2. Copy [assets/deck.html](assets/deck.html) there as `index.html`, and the examples [assets/visuals.css](assets/visuals.css), [assets/visuals.js](assets/visuals.js) and [assets/content.js](assets/content.js) next to it. `index.html` is the deck itself, with its own neutral look; don't edit it. Replace the examples in the other three files with your own, writing each file whole:
    - `visuals.css`: styles for the visuals, such as the app's colours, fonts and components. The deck's own classes all start with `dk-`; don't use that prefix.
    - `visuals.js`: helpers that draw the parts the visuals repeat, such as a phone frame, an app bar, a list row or an icon, so each slide's markup stays short and consistent.
@@ -70,7 +70,10 @@ Give the user the URL and open it in their preview if you can. Keep the message 
 
 Keep the server running while the user reviews. Stop it when they're done, or when you finish the follow-up work.
 
-Then, while the user reviews, save the project's look for the next deck if this one drew the app's UI and lives in a workspace. Copy `visuals.css`, `visuals.js` and the assets they use (fonts, icon fonts and glyph maps, icons) to `.agents-workspaces/deck-kit/`, creating it or updating what you changed. Keep only what draws the app, not this deck's mockups or screenshots. Write or update its `KIT.md`: what each helper draws, the project files and commit the look was taken from, where the fonts and icons came from, and how you captured screenshots of the app, if you did.
+Then, while the user reviews:
+
+- Fill in the workspace's documents: the request, what you found, and where the deck is.
+- If the deck drew the app's UI and lives in a workspace, save the project's look for the next deck. Copy `visuals.css`, `visuals.js` and the assets they use (fonts, icon fonts and glyph maps, icons) to `.agents-workspaces/deck-kit/`, creating it or updating what you changed. Keep only what draws the app, not this deck's mockups or screenshots. Write or update its `KIT.md`: what each helper draws, the project files and commit the look was taken from, where the fonts and icons came from, and how you captured screenshots of the app, if you did.
 
 ## 5. Act on the decisions
 
