@@ -4,7 +4,7 @@
 //
 // Without steps it shoots every slide, and on slides with variants every option of each variant,
 // with the slide's other variants on their proposed option. A step is { name, hash?, eval? }: go to
-// slide <hash>, optionally run JS (its result is printed), and save <out dir>/<name>.png. For each
+// slide number <hash>, optionally run JS (its result is printed), and save <out dir>/<name>.png. For each
 // shot it prints the scale the deck fitted the visuals to; then it prints any page errors and exits
 // with 1 if there were some.
 //
@@ -103,12 +103,12 @@ await evaluate("document.fonts.ready.then(() => true)");
 const steps = stepsJson ? JSON.parse(stepsJson) : (await evaluate(`(() => {
   const steps = [];
   document.querySelectorAll(".dk-slide").forEach((slide, i) => {
-    const base = String(i).padStart(2, "0") + "-" + slide.dataset.key;
+    const base = String(i + 1).padStart(2, "0") + "-" + slide.dataset.key;
     const groups = {};
     slide.querySelectorAll(".dk-variant input[type=radio]").forEach((r) => (groups[r.name] ??= []).push(r.value));
-    if (!Object.keys(groups).length) steps.push({ name: base, hash: i });
+    if (!Object.keys(groups).length) steps.push({ name: base, hash: i + 1 });
     for (const [name, values] of Object.entries(groups)) for (const value of values) steps.push({
-      name: base + "-" + name.slice(slide.dataset.key.length + 1) + "-" + value, hash: i,
+      name: base + "-" + name.slice(slide.dataset.key.length + 1) + "-" + value, hash: i + 1,
       // Reset the slide's other variants to their proposed option first, so each shot shows one change.
       eval: '(() => { const s = document.querySelectorAll(".dk-slide")[' + i + ']; ' +
         's.querySelectorAll("input[data-default]").forEach((r) => r.click()); ' +

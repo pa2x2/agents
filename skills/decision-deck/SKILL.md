@@ -19,6 +19,8 @@ Each slide is one decision: a proposed change, a finding to act on, or a questio
 
 Group related findings into one slide. Put small, self-explanatory fixes in the `SMALL` list, which all share one slide and are decided one by one.
 
+The deck opens on the first slide and the user goes through the slides one after another, so put them in the order they should be decided: a decision before the slides that depend on it.
+
 Word every slide and small fix as a change to make, so Keep means "do it" and Drop means "don't". An item that says what won't happen ("No new tests", "Debug builds have no updater") turns Drop into a double negative. Implementation details like that belong in the plan, not the deck; if one needs a decision, word it as the action ("Leave the updater out of debug builds").
 
 ## 2. Create the deck
@@ -39,7 +41,6 @@ Word every slide and small fix as a change to make, so Keep means "do it" and Dr
    - `abs`: for an overlay, popover or dialog. The wrapper becomes the absolutely positioned box, so pass its position (`top`, `right`, ...) in `style` and give the inner element `position: static`.
 
    The tag sits above the outline's top-right corner, outside the wrapped element. An ancestor with `overflow: hidden`, such as a phone frame or a rounded card, clips it, and outlines close together overlap their tags. Leave room above each outline, or put the `overflow: hidden` inside the wrapped part.
-5. Use `DECK.intro` for the suggested order to go through the slides and for caveats, such as UI mockups being drawn rather than captured.
 
 ## 3. Check it renders
 
@@ -48,15 +49,15 @@ Serve the directory and look at every slide before handing it over.
 1. Pick a free port (check with `ss -ltn`; a stale server may already hold a common one) and run `python3 -m http.server <port> --bind 127.0.0.1` in the background from the deck directory.
 2. Run [scripts/render.mjs](scripts/render.mjs): `node <this skill's directory>/scripts/render.mjs <deck URL> <out dir>`. It needs Node 22+ and a Chromium-family browser (set `DECK_BROWSER` if it isn't found). It screenshots every slide at full resolution, and every option of every variant with the slide's other variants on their proposed option. For each shot it prints the scale the visuals were fitted to, and it lists any page errors. Read the screenshots and fix what looks wrong: misaligned or cramped visuals, truncated text, clipped highlight tags, and overlays stretched full width or misplaced (see `abs` above). Visuals scaled below about 70% are too crowded. A red "Deck error" bar names the file and line of a script error, or a file that failed to load. Run it again after each round of fixes.
 
-   Use the script even when you have a browser preview: preview screenshots are usually scaled down and too blurry to read small text, so they miss what this check is for. Only if the script can't run, check in the preview instead: step through each slide (set `location.hash = "#N"` or click `.dk-dots [data-go="N"]`), select each variant option once, and wait for `document.fonts.ready` before judging fonts and icons.
+   Use the script even when you have a browser preview: preview screenshots are usually scaled down and too blurry to read small text, so they miss what this check is for. Only if the script can't run, check in the preview instead: step through each slide (set `location.hash = "#N"` for slide N, or click `.dk-dots [data-go="N"]`), select each variant option once, and wait for `document.fonts.ready` before judging fonts and icons.
 3. Open the deck in the user's browser preview, if you have one, at the size it opens. Don't resize the preview or change its viewport. The deck fits its visuals to the window by itself, and resizing has made previews stop responding. If a preview call fails, open the page in it again (visibly, if the tool can show or hide it) and retry once before deciding it doesn't work.
-4. Test the controls once: arrow keys move slides, a decision colours its dot, and the summary slide lists the answers. In the preview, clear the test answers afterwards with `localStorage.removeItem(DECK.storageKey)`, then load the page again with `location.href = "<deck URL>#0"` or the preview's own navigation. Don't call `location.reload()` inside a scripted evaluate: the call fails when the page goes away under it. Without a preview, test them with the script's own steps (its header explains them); answers set that way stay in its throwaway browser profile.
+4. Test the controls once: arrow keys move slides, a decision colours its dot, and the summary slide lists the answers. In the preview, clear the test answers afterwards with `localStorage.removeItem(DECK.storageKey)`, then load the page again with `location.href = "<deck URL>#1"` or the preview's own navigation. Don't call `location.reload()` inside a scripted evaluate: the call fails when the page goes away under it. Without a preview, test them with the script's own steps (its header explains them); answers set that way stay in its throwaway browser profile.
 
 If you couldn't render the page at all, say so when you hand it over.
 
 ## 4. Hand it over
 
-Give the user the URL and open it in their preview if you can. Keep the message short, about five lines. The deck is where the proposals are, and its intro lists every slide, so don't list, summarise or tabulate the slides in chat. Say:
+Give the user the URL and open it in their preview if you can. Keep the message short, about five lines. The deck is where the proposals are, and its last slide lists every slide, so don't list, summarise or tabulate the slides in chat, or suggest an order to go through them. Say:
 
 - How many slides there are.
 - Anything the user needs to know before reviewing that the slides don't make clear, such as mockups being drawn rather than captured, made-up sample data, or a bug you reproduced while investigating. If there's nothing, skip this.

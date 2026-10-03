@@ -4,8 +4,6 @@ const DECK = {
   title: "Project — decisions",
   // Answers persist in localStorage under this key. Use a new key per deck.
   storageKey: "project-decisions-v1",
-  // Extra intro paragraph (HTML): suggested order, caveats such as "drawn, not screenshots".
-  intro: "Nothing has been changed yet.",
   // Hue (0-360) per kind, used for the badge colour.
   kinds: { fix: { label: "Fix", hue: 3 }, change: { label: "Change", hue: 215 } },
 };
