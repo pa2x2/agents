@@ -1,0 +1,11 @@
+/* Styles for what the slides show; the deck's own styles live in index.html.
+   A visual of an existing UI should look like that UI: take its colours, fonts and components from
+   the project. Diagrams, code and tables can stay plain. The deck's own classes all start with dk-,
+   so any other class name is free; v- is only a convention. */
+.v-card { position: relative; width: 300px; background: #fff; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.1); overflow: hidden; }
+.v-row { padding: 12px 16px; border-bottom: 1px solid #ddd; }
+.v-btn { display: inline-block; padding: 10px 18px; border-radius: 6px; background: #555; color: #fff; }
+.v-muted { color: #777; }
+.v-flow { display: flex; align-items: center; gap: 10px; }
+.v-box { background: #fff; border: 1px solid #ccc; border-radius: 10px; padding: 12px 14px; font-size: 14px; white-space: nowrap; }
+.v-toast { background: #222; color: #fff; border-radius: 8px; padding: 10px 14px; font-size: 14px; }
