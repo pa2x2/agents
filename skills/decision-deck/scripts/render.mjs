@@ -1,11 +1,12 @@
-// Screenshots a deck in a headless Chromium-family browser, for when no browser preview is available.
+// Screenshots a deck at full resolution in a headless Chromium-family browser.
 //
 //   node render.mjs <deck URL> <out dir> [steps JSON]
 //
-// Without steps it shoots every slide, and on slides with variants every option of each variant.
-// A step is { name, hash?, eval? }: go to slide <hash>, optionally run JS (its result is printed),
-// and save <out dir>/<name>.png. For each shot it prints how far the visuals were scaled down to
-// fit; then it prints any page errors and exits with 1 if there were some.
+// Without steps it shoots every slide, and on slides with variants every option of each variant,
+// with the slide's other variants on their proposed option. A step is { name, hash?, eval? }: go to
+// slide <hash>, optionally run JS (its result is printed), and save <out dir>/<name>.png. For each
+// shot it prints the scale the deck fitted the visuals to; then it prints any page errors and exits
+// with 1 if there were some.
 //
 // Needs Node 22+ (global fetch and WebSocket). Looks for chromium, chrome, brave or edge; set
 // DECK_BROWSER to the browser's executable if it isn't found. DECK_SIZE sets the viewport
@@ -20,6 +21,8 @@ if (!url || !outDir) {
   console.error("usage: node render.mjs <deck URL> <out dir> [steps JSON]");
   process.exit(2);
 }
+// Output piped into head or similar may close early; keep going so the browser still gets cleaned up.
+process.stdout.on("error", () => {});
 const [width, height] = (process.env.DECK_SIZE ?? "1600x1000").split("x").map(Number);
 const scale = Number(process.env.DECK_SCALE ?? 1);
 
@@ -106,7 +109,10 @@ const steps = stepsJson ? JSON.parse(stepsJson) : (await evaluate(`(() => {
     if (!Object.keys(groups).length) steps.push({ name: base, hash: i });
     for (const [name, values] of Object.entries(groups)) for (const value of values) steps.push({
       name: base + "-" + name.slice(slide.dataset.key.length + 1) + "-" + value, hash: i,
-      eval: 'document.querySelector(\\'input[name="' + name + '"][value="' + value + '"]\\').click()',
+      // Reset the slide's other variants to their proposed option first, so each shot shows one change.
+      eval: '(() => { const s = document.querySelectorAll(".dk-slide")[' + i + ']; ' +
+        's.querySelectorAll("input[data-default]").forEach((r) => r.click()); ' +
+        's.querySelector(\\'input[name="' + name + '"][value="' + value + '"]\\').click(); })()',
     });
   });
   return steps;
