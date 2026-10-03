@@ -99,10 +99,10 @@ await evaluate("document.fonts.ready.then(() => true)");
 // Default steps: each slide once, or once per variant option on slides with variants.
 const steps = stepsJson ? JSON.parse(stepsJson) : (await evaluate(`(() => {
   const steps = [];
-  document.querySelectorAll(".slide").forEach((slide, i) => {
+  document.querySelectorAll(".dk-slide").forEach((slide, i) => {
     const base = String(i).padStart(2, "0") + "-" + slide.dataset.key;
     const groups = {};
-    slide.querySelectorAll(".variant input[type=radio]").forEach((r) => (groups[r.name] ??= []).push(r.value));
+    slide.querySelectorAll(".dk-variant input[type=radio]").forEach((r) => (groups[r.name] ??= []).push(r.value));
     if (!Object.keys(groups).length) steps.push({ name: base, hash: i });
     for (const [name, values] of Object.entries(groups)) for (const value of values) steps.push({
       name: base + "-" + name.slice(slide.dataset.key.length + 1) + "-" + value, hash: i,
@@ -118,7 +118,7 @@ for (const step of steps) {
   await sleep(150);
   const result = step.eval ? await evaluate(step.eval) : undefined;
   await sleep(250);
-  const zoom = await evaluate(`(() => { const s = document.querySelector(".slide.on .shots"); return s ? Math.round(parseFloat(s.style.zoom || 1) * 100) : null; })()`);
+  const zoom = await evaluate(`(() => { const s = document.querySelector(".dk-slide.dk-on .dk-shots"); return s ? Math.round(parseFloat(s.style.zoom || 1) * 100) : null; })()`);
   const shot = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(join(outDir, `${step.name}.png`), Buffer.from(shot.result.data, "base64"));
   console.log(`${step.name}.png${zoom !== null ? `  visuals at ${zoom}%` : ""}${result !== undefined ? `  → ${JSON.stringify(result)}` : ""}`);
