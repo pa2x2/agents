@@ -30,7 +30,7 @@ Word every slide and small fix as a change to make, so Keep means "do it" and Dr
    - **Fonts**: the browser may not have a platform font the app uses, such as Roboto on Android or SF Pro on Apple platforms, and silently falls back to another face. Copy the font file next to `index.html` (from the project, its dependencies, or a device or emulator: `adb pull /system/fonts/Roboto-Regular.ttf`) and load it with `@font-face`. End every font stack with a generic family (`sans-serif`).
    - **Anything else**: a diagram of the flow or structure, before/after code or config, a table, sample output. Plain HTML and CSS is enough.
 
-   Keep a slide to about three visuals side by side. The deck shrinks the visuals to fit, so more makes them too small to read. Show several states of one screen as a grid inside one visual, or split the slide.
+   Keep a slide to about three visuals side by side. The deck scales the visuals to fit the window, enlarging small ones up to 140% and shrinking big ones as far as needed, so more makes them too small to read. Don't add your own zoom to them. Show several states of one screen as a grid inside one visual, or split the slide.
 4. Wrap each changed part of a Proposed shot in `hl(tag, html, cls, style)`, so a dashed outline and a short tag ("new", "renamed", "appears on edit") mark what changes. Leave "Now" shots unmarked. By default `hl` is a block `<div>`. Two classes change that:
    - `inline`: an inline-block `<span>`, for a label inside a row or a value in a table cell.
    - `abs`: for an overlay, popover or dialog. The wrapper becomes the absolutely positioned box, so pass its position (`top`, `right`, ...) in `style` and give the inner element `position: static`.

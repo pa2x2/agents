@@ -359,14 +359,16 @@ function renderNav() {
     `<button data-toc="${go}"><span class="dk-num">${n}</span>${t}<span style="margin-left:auto">${badge}</span><span class="dk-state dk-${d}">${d}</span></button>`).join("");
 }
 
-// Scale the visuals down so everything on a slide fits the stage without scrolling.
+// Scale the visuals so everything on a slide fits the stage without scrolling. Small visuals grow too,
+// up to MAX_ZOOM, so they don't sit in a mostly empty stage on a large window.
+const MAX_ZOOM = 1.4;
 function fit() {
   const slide = els[current];
   const shots = slide.querySelector(".dk-shots");
   if (!shots) return;
   shots.style.zoom = 1;
   const stage = slide.querySelector(".dk-stage").getBoundingClientRect();
-  const scale = Math.min(1, (stage.width - 8) / shots.scrollWidth, (stage.height - 8) / shots.scrollHeight);
+  const scale = Math.min(MAX_ZOOM, (stage.width - 8) / shots.scrollWidth, (stage.height - 8) / shots.scrollHeight);
   shots.style.zoom = scale;
 }
 
