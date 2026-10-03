@@ -43,13 +43,13 @@ Word every slide and small fix as a change to make, so Keep means "do it" and Dr
 Serve the directory and look at every slide before handing it over.
 
 1. Pick a free port (check with `ss -ltn`; a stale server may already hold a common one) and run `python3 -m http.server <port> --bind 127.0.0.1` in the background from the deck directory.
-2. Open it in whatever browser preview or screenshot tool you have, at the size it opens. Don't resize the preview or change its viewport. The deck fits its visuals to the window by itself, and resizing has made previews stop responding. If a preview call fails, open the page in it again (visibly, if the tool can show or hide it) and retry once before deciding it doesn't work. Wait for `document.fonts.ready` before judging fonts and icons.
+2. Run [scripts/render.mjs](scripts/render.mjs): `node <this skill's directory>/scripts/render.mjs <deck URL> <out dir>`. It needs Node 22+ and a Chromium-family browser (set `DECK_BROWSER` if it isn't found). It screenshots every slide at full resolution, and every option of every variant with the slide's other variants on their proposed option. For each shot it prints the scale the visuals were fitted to, and it lists any page errors. Read the screenshots and fix what looks wrong: misaligned or cramped visuals, truncated text, clipped highlight tags, and overlays stretched full width or misplaced (see `abs` above). Visuals scaled below about 70% are too crowded. A red "Deck error" bar instead of slides means the deck script has an error at the line it names. Run it again after each round of fixes.
 
-   If no preview works, run [scripts/render.mjs](scripts/render.mjs): `node <this skill's directory>/scripts/render.mjs <deck URL> <out dir>`. It screenshots every slide, and every option of every variant, in a headless Chromium-family browser. For each slide it prints how far the visuals were scaled down, and it lists any page errors. Read the screenshots to check them. Its header explains how to pass your own steps, for example to test the controls.
-3. Step through each slide (set `location.hash = "#N"`, press → or click `.dk-dots [data-go="N"]`) and fix what looks wrong: misaligned or cramped visuals, truncated text, clipped highlight tags, and overlays stretched full width or misplaced (see `abs` above). Visuals scaled below about 70% are too crowded. On slides with variants, select each option once to check its visual. A red "Deck error" bar instead of slides means the deck script has an error at the line it names.
-4. Test the controls once: arrow keys move slides, a decision colours its dot, and the summary slide lists the answers. Clear the test answers from `localStorage` afterwards.
+   Use the script even when you have a browser preview: preview screenshots are usually scaled down and too blurry to read small text, so they miss what this check is for. Only if the script can't run, check in the preview instead: step through each slide (set `location.hash = "#N"` or click `.dk-dots [data-go="N"]`), select each variant option once, and wait for `document.fonts.ready` before judging fonts and icons.
+3. Open the deck in the user's browser preview, if you have one, at the size it opens. Don't resize the preview or change its viewport. The deck fits its visuals to the window by itself, and resizing has made previews stop responding. If a preview call fails, open the page in it again (visibly, if the tool can show or hide it) and retry once before deciding it doesn't work.
+4. Test the controls once: arrow keys move slides, a decision colours its dot, and the summary slide lists the answers. In the preview, clear the test answers afterwards with `localStorage.removeItem(DECK.storageKey)`, then load the page again with `location.href = "<deck URL>#0"` or the preview's own navigation. Don't call `location.reload()` inside a scripted evaluate: the call fails when the page goes away under it. Without a preview, test them with the script's own steps (its header explains them); answers set that way stay in its throwaway browser profile.
 
-If you checked it headless, or have no way to render the page at all, say so when you hand it over.
+If you couldn't render the page at all, say so when you hand it over.
 
 ## 4. Hand it over
 
@@ -58,7 +58,7 @@ Give the user the URL and open it in their preview if you can. Keep the message 
 - How many slides there are.
 - Anything the user needs to know before reviewing that the slides don't make clear, such as mockups being drawn rather than captured, made-up sample data, or a bug you reproduced while investigating. If there's nothing, skip this.
 - In one line: ← and → move between slides, each slide is decided with Keep / Change / Drop, variants and notes, and the last slide exports the answers to paste back.
-- Where the deck lives, that nothing in the project has changed yet, and that the local server is still running. If you couldn't open it in their preview, say so and that you checked it headless.
+- Where the deck lives, that nothing in the project has changed yet, and that the local server is still running. If you couldn't open it in their preview, say so.
 
 Keep the server running while the user reviews. Stop it when they're done, or when you finish the follow-up work.
 
