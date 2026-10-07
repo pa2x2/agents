@@ -37,7 +37,6 @@ const P = [
   problem: ["While the upstream API is slow, the handler retries it and keeps the client's request open."],
   proposal: ["Queue the call and retry it in a background worker.", "The handler answers 202 right away."],
   refs: "src/api/handler.ts · src/jobs/",
-  variants: [],
   shots: [
     shot("now", "Request path", `<div class="v-flow"><div class="v-box">Client</div>→<div class="v-box">Handler<br><span class="v-muted">retries ×3</span></div>→<div class="v-box">Upstream API</div></div>`),
     shot("new", "Request path", `<div class="v-flow"><div class="v-box">Client</div>→<div class="v-box">Handler</div>→${hl("new", `<div class="v-box">Queue</div>`, "", "border-radius:10px")}→${hl("new", `<div class="v-box">Worker<br><span class="v-muted">retries ×3</span></div>`, "", "border-radius:10px")}→<div class="v-box">Upstream API</div></div>`),

@@ -169,23 +169,24 @@ const shot = (kind, caption, html, when = null) =>
 <script>
 // ---------- rendering + decisions ----------
 // If content.js failed, its error is already on the page and there is nothing to render.
-try { DECK; P; SMALL; } catch { throw new Error("content.js didn't define DECK, P and SMALL; see the error above"); }
+try { DECK; P; } catch { throw new Error("content.js didn't define DECK and P; see the error above"); }
 const KEY = DECK.storageKey;
 const state = JSON.parse(localStorage.getItem(KEY) || "{}");
 const save = () => localStorage.setItem(KEY, JSON.stringify(state));
 const decisionOf = (id) => state[id]?.decision ?? "undecided";
 const kindBadge = (k) => `<span class="dk-kind" style="--h:${DECK.kinds[k]?.hue ?? 220}">${DECK.kinds[k]?.label ?? k}</span>`;
-P.forEach((p, i) => { p.n = i + 1; });
-// CHECKED is optional, so a follow-up deck can leave it out.
+P.forEach((p, i) => { p.n = i + 1; p.variants ??= []; });
+// SMALL and CHECKED are optional, so a follow-up deck can leave them out.
+const small = typeof SMALL === "undefined" ? [] : SMALL;
 const checked = typeof CHECKED === "undefined" ? [] : CHECKED;
 const smallN = P.length + 1;
-const checkedN = P.length + (SMALL.length ? 1 : 0) + 1;
+const checkedN = P.length + (small.length ? 1 : 0) + 1;
 
 const decisionSeg = (id) => `<div class="dk-seg">${["keep", "change", "drop"].map((v) =>
   `<input type="radio" name="${id}-d" id="${id}-${v}" value="${v}" data-id="${id}" data-f="decision"><label for="${id}-${v}">${v[0].toUpperCase() + v.slice(1)}</label>`).join("")}</div>`;
 
 const slides = [...P.map((p) => ({ key: p.id, label: String(p.n), p })),
-  ...(SMALL.length ? [{ key: "small", label: String(smallN) }] : []),
+  ...(small.length ? [{ key: "small", label: String(smallN) }] : []),
   ...(checked.length ? [{ key: "checked", label: String(checkedN) }] : []), { key: "summary", label: "✓" }];
 
 document.title = DECK.title;
@@ -206,9 +207,9 @@ for (const p of P) {
   </div><div class="dk-stage"><div class="dk-shots">${p.shots.join("")}</div></div></section>`;
 }
 
-if (SMALL.length) {
+if (small.length) {
   html += `<section class="dk-slide dk-page" data-key="small"><header style="display:flex;gap:12px;align-items:center"><span class="dk-num">${smallN}</span><h1 style="margin:0;font-size:26px">Small fixes</h1></header>
-    <div class="dk-smalls">${SMALL.map((s) => `<div class="dk-small"><p><span class="dk-stitle">${s.title}</span>${s.text}</p><div>${decisionSeg(s.id)}</div>
+    <div class="dk-smalls">${small.map((s) => `<div class="dk-small"><p><span class="dk-stitle">${s.title}</span>${s.text}</p><div>${decisionSeg(s.id)}</div>
     <textarea class="dk-note" data-id="${s.id}" data-f="note" placeholder="Notes"></textarea></div>`).join("")}</div></section>`;
 }
 
@@ -265,7 +266,7 @@ for (const el of document.querySelectorAll("[data-id]")) {
   });
 }
 for (const p of P) { showVariantShots(p.id); markEmptyChangeNote(p.id); }
-for (const s of SMALL) markEmptyChangeNote(s.id);
+for (const s of small) markEmptyChangeNote(s.id);
 
 function exportText() {
   const lines = [`${DECK.title}: decisions`, ""];
@@ -280,8 +281,8 @@ function exportText() {
     }
     if (note(p.id)) lines.push(`   Note: ${note(p.id).replace(/\n/g, "\n         ")}`);
   }
-  if (SMALL.length) lines.push(`${smallN}. Small fixes`);
-  for (const s of SMALL) {
+  if (small.length) lines.push(`${smallN}. Small fixes`);
+  for (const s of small) {
     lines.push(`   - ${s.title}: ${decisionOf(s.id).toUpperCase()}`);
     if (note(s.id)) lines.push(`     Note: ${note(s.id).replace(/\n/g, "\n           ")}`);
   }
@@ -301,7 +302,7 @@ let current = Math.min(Math.max(fromHash(), 0), els.length - 1);
 function slideDecision(s) {
   if (s.p) return decisionOf(s.p.id);
   if (s.key === "small") {
-    const d = SMALL.map((x) => decisionOf(x.id));
+    const d = small.map((x) => decisionOf(x.id));
     return d.every((x) => x !== "undecided") ? (d.includes("change") ? "change" : d.every((x) => x === "drop") ? "drop" : "keep") : "undecided";
   }
   return "undecided";
@@ -311,7 +312,7 @@ function renderNav() {
   document.getElementById("dots").innerHTML = slides.map((s, i) =>
     `<button class="${i === current ? "dk-on" : ""} dk-${slideDecision(s)}" data-go="${i + 1}" title="${s.p ? s.p.title : s.key}">${s.label}</button>`).join("");
   const rows = P.map((p) => [p.n, p.title, kindBadge(p.kind), decisionOf(p.id)]);
-  if (SMALL.length) rows.push([smallN, "Small fixes", "", slideDecision(slides[smallN - 1])]);
+  if (small.length) rows.push([smallN, "Small fixes", "", slideDecision(slides[smallN - 1])]);
   if (checked.length) rows.push([checkedN, "Checked, no change proposed", "", checked.some((c) => state[c.id]?.note?.trim()) ? "noted" : ""]);
   document.getElementById("toc").innerHTML = rows.map(([n, t, badge, d]) =>
     `<button data-toc="${n}"><span class="dk-num">${n}</span>${t}<span style="margin-left:auto">${badge}</span><span class="dk-state dk-${d}">${d}</span></button>`).join("");

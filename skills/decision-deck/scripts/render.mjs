@@ -8,6 +8,13 @@
 // shot it prints the scale the deck fitted the visuals to; then it prints any page errors and exits
 // with 1 if there were some.
 //
+// Controls, for steps that test them (<id> is a slide's or small fix's id, <key> a variant's key):
+//   decide:        document.querySelector('label[for="<id>-keep"]').click()   (or -change, -drop)
+//   pick option:   document.querySelector('input[name="<id>-<key>"][value="<option>"]').click()
+//   slide's dot:   document.querySelector('.dk-dots [data-go="N"]').className   (dk-keep, dk-change, ...)
+//   export text:   document.getElementById("exportText").value   (filled on the last slide)
+// e.g. '[{"name":"keep","hash":1,"eval":"document.querySelector(\"label[for=p1-keep]\").click(); document.querySelectorAll(\".dk-dots button\")[0].className"}]'
+//
 // Needs Node 22+ (global fetch and WebSocket). Looks for chromium, chrome, brave or edge; set
 // DECK_BROWSER to the browser's executable if it isn't found. DECK_SIZE sets the viewport
 // (default 1600x1000), DECK_SCALE the pixel ratio (default 1; 2 for sharp crops).
