@@ -29,7 +29,10 @@ body { margin: 0; overflow: hidden; background: var(--page); color: var(--page-t
 .dk-slide { display: none; position: absolute; inset: 0; padding: 20px 24px 12px; }
 .dk-slide.dk-on { display: grid; grid-template-columns: minmax(330px, 390px) 1fr; gap: 28px; }
 .dk-slide.dk-page.dk-on { display: block; overflow-y: auto; padding: 36px max(24px, calc(50% - 480px)); }
-.dk-side { overflow-y: auto; padding: 4px 8px 12px 2px; min-height: 0; }
+/* Long words (code identifiers, file paths) wrap instead of scrolling the side sideways; overflow-x
+   clips whatever still can't shrink. */
+.dk-side { overflow-y: auto; overflow-x: hidden; overflow-wrap: anywhere; padding: 4px 8px 12px 2px; min-height: 0; }
+.dk-side pre { white-space: pre-wrap; } .dk-side :is(img, svg, video, table) { max-width: 100%; }
 .dk-stage { display: flex; align-items: center; justify-content: center; overflow: hidden; min-width: 0; min-height: 0; }
 
 .dk-bottom { position: fixed; bottom: 0; left: 0; right: 0; height: 56px; display: flex; align-items: center; justify-content: center; gap: 16px;
