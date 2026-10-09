@@ -129,7 +129,7 @@ body.dk-nohl .hl { outline: none; } body.dk-nohl .hl::after { display: none; }
 <body>
 <div class="dk-top">
   <h1 id="deckTitle"></h1>
-  <label><input type="checkbox" id="hlToggle" checked /> Highlight changes</label>
+  <label><input type="checkbox" id="hlToggle" checked autocomplete="off" /> Highlight changes</label>
   <button class="dk-btn dk-ghost" id="resetBtn">Reset answers</button>
   <button class="dk-btn" id="exportBtn">Export decisions</button>
 </div>
@@ -374,7 +374,15 @@ document.getElementById("copyBtn").onclick = async () => {
   catch { t.select(); document.getElementById("copied").textContent = "Press Ctrl+C to copy the selection"; }
 };
 document.getElementById("resetBtn").onclick = () => { if (confirm("Clear all answers?")) { localStorage.removeItem(KEY); location.reload(); } };
-document.getElementById("hlToggle").onchange = (e) => { document.body.classList.toggle("dk-nohl", !e.target.checked); e.target.blur(); };
+// The highlight setting is kept apart from the answers, so "Reset answers" leaves it as it is.
+const HL_KEY = `${KEY}:highlight`;
+const setHighlight = (on) => { document.getElementById("hlToggle").checked = on; document.body.classList.toggle("dk-nohl", !on); };
+setHighlight(localStorage.getItem(HL_KEY) !== "off");
+document.getElementById("hlToggle").onchange = (e) => {
+  setHighlight(e.target.checked);
+  localStorage.setItem(HL_KEY, e.target.checked ? "on" : "off");
+  e.target.blur();
+};
 go(current);
 </script>
 </body>
