@@ -4,18 +4,16 @@
 
 [Concise outcome]
 
-## Status
-
-| Unit | Scope | Status |
-|---|---|---|
-| 0 | Investigation and workspace | In progress |
-
 ## Definition of completion
 
 - [Observable completed behavior]
 
-## Unit 0: Investigation and architecture
+## Status
 
-- Locate the shared owner and current behavior.
-- Record evidence and unresolved decisions.
-- Stop for review before an implementation unit unless implementation is already authorized.
+| Unit/step | Scope | Status | Commit | Notes |
+|---|---|---|---|---|
+| 0 | Investigation and design | In progress | | |
+
+## Unit 0: Investigation and design
+
+- [Steps, review gates and checks]

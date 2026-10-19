@@ -1,19 +1,21 @@
 # [Feature title] Decisions
 
-Record accepted decisions and open choices here. Do not silently convert a recommendation into an accepted decision.
+IDs are stable: an item keeps its ID when it moves between sections.
 
 ## Accepted
 
-### D001: Workspace creation is not implementation authority
+### D001: [Decision]
 
-Status: Accepted from workspace policy on [date].
+Accepted by the user on [date]. [Decision and rationale.]
 
-Creating and revising these ignored documents does not authorize production, test, device, commit, or external changes.
+## Recommended
 
-## Recommended, not yet implementation-approved
+### D002: [Recommendation, not yet accepted]
 
-- [Recommendation]
+## Open
 
-## Open choices
+### D003: [Question requiring user direction]
 
-- [Question requiring user direction]
+## Superseded
+
+[Superseded decisions move here, each marked "Superseded by DNNN on [date]".]

@@ -1,20 +1,14 @@
-# Workspace Rules
+# [Feature title] Rules
 
-These rules apply to work governed by this workspace.
+Rules for this task only. Repo-wide rules: [links to the repository's instructions].
 
-## Authorization boundary
+## Scope and compatibility
 
-- Persisting or revising this workspace is not production implementation authority.
-- Do not change production code, tests, fixtures, snapshots, dependencies, device state, commits, tags, publications, or pull requests without explicit current-request authorization.
-- Read and follow authoritative repository instructions before related work. Link them here rather than copying broad rules that can drift.
-
-## Product and compatibility scope
-
-- [Record accepted scope and compatibility constraints after inspection.]
+- [Accepted constraint]
 
 ## Ownership
 
-- [Record the owners that must be respected after inspection.]
+- [Owner that must be respected]
 
 ## Validation and handoff
 

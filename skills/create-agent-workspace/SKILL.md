@@ -1,38 +1,60 @@
 ---
 name: create-agent-workspace
-description: Create an immediately usable, ignored planning workspace for a requested feature or change. Use when the user asks to create a workspace, planning workspace, feature workspace, or change workspace that records requirements, rules, architecture, decisions, plans, and dated work notes.
+description: Create, resume and maintain a workspace recording a feature's or change's requirements, rules, architecture, decisions, plan and dated notes. Use when the user asks to create a workspace or record decisions so far; asks to resume, continue, start working on or update a workspace, or whether it is up to date; or references a `.agents-workspaces/` path.
 ---
 
-# Create Agent Workspace
+# Agent Workspace
 
-Create the workspace before analysing or implementing the requested change. It is a durable planning artifact, not authority to modify product code, tests, device state, commits, or external systems. Workspace's purpose is for you to track your work. You should keep reporting and conversation with user inside the chat.
+A workspace is the durable record of one feature or change that later sessions resume from. Keep reporting to the user in chat; don't point them at files instead of answering.
 
-## Create the workspace
+Creating or editing a workspace doesn't authorize product changes, commits or external actions. When the user asks to start or continue work on a unit, that authorizes that unit.
 
-1. Resolve the repository root with Git. Outside a Git worktree, use the current directory as the workspace root.
-2. Determine the harness label in this order: the active harness identity, an explicit user-provided value, then `unknown_agent`.
-3. Derive a lowercase kebab-case feature slug from the user request. Preserve meaningful nouns and omit generic words such as `feature` or `changes` when that makes the name clearer.
-4. Create `<root>/.agents-workspaces/<harness>-<feature>/`. Never overwrite an existing workspace. If the desired directory exists, create the next numeric sibling, for example `codex-reader-refactor-2`.
-5. Ensure the root `.gitignore` contains exactly `/.agents-workspaces/`. Create the file if needed; do not replace or reorder existing rules.
-6. Copy the six templates from [assets/templates](assets/templates) and replace bracketed placeholders with the initial request, resolved paths, harness, and creation date.
-7. Treat the workspace as your internal record, keep the actual conversation with user in chat, don't blindly send user to check your files and notes.
+## Create
 
-## Fill the initial documents
+1. Root: `git rev-parse --show-toplevel`, or the current directory outside Git.
+2. Create `<root>/.agents-workspaces/<feature>/`: a kebab-case slug of the request. Never overwrite; use the next numeric sibling (`reader-refactor-2`).
+3. Ensure `$(git rev-parse --git-common-dir)/info/exclude` contains `/.agents-workspaces/`. Don't edit tracked files such as `.gitignore`.
+4. Copy and fill [assets/templates](assets/templates). If the conversation already covered the task, record that first: requirements, findings, and each decision as accepted by the user, recommended by you, or open.
+5. Ensure the memory pointer.
 
-Keep every claim traceable. Place the original request in `README.md`; mark unverified interpretations as assumptions or open questions rather than facts.
+## Documents
 
-- `README.md`: scope, non-goals, status, and navigation.
-- `AGENTS.md`: task-specific rules, authorization boundaries, compatibility constraints, and validation reporting expectations. Link authoritative repository instructions instead of duplicating them.
-- `ARCHITECTURE.md`: only known current/target ownership, data flow, and compatibility seams. Do not invent an architecture before inspection.
-- `DECISIONS.md`: separate accepted user decisions, recommendations, and open choices. Do not silently promote recommendations.
-- `PLAN.md`: implementation units, review gates, and definition of completion. Keep implementation units pending until explicitly authorized.
-- `NOTES.md`: append dated evidence, commands/checks run, user direction, and discoveries. Do not use it as an unstructured replacement for the plan or decisions.
+Keep every claim traceable to the user, the code or a dated note; mark unverified interpretations as assumptions.
 
-Create a narrowly named seventh document only when an independently durable concern emerges, such as format compatibility, provider capabilities, migration strategy, or a protocol. Keep it in the workspace root and link it from `README.md`.
+- `README.md`: request, scope, non-goals, **Current state** (the live design in a few bullets, not decision IDs), links to every doc.
+- `AGENTS.md`: rules for this task only; link repo instructions rather than copy them. Suggest moving any repo-wide convention you find ("migrations are generated with `dotnet ef`") to the repo's CLAUDE.md or memory.
+- `ARCHITECTURE.md`: current and target ownership, data flow and seams, from evidence.
+- `DECISIONS.md`: accepted, recommended and open items with stable IDs; never promote a recommendation silently. Move superseded ones, marked with their replacement, to `## Superseded` at the bottom (or `DECISIONS-ARCHIVE.md` once long).
+- `PLAN.md`: units and steps with status, commit hash and notes.
+- `NOTES.md`: dated log of user direction, evidence, checks run and syncs.
 
-## Refine during work
+Optional:
 
-Read the workspace before each related task. Update it when new user direction, architecture evidence, validation evidence, an accepted decision, or a meaningful scope change appears. Preserve dated evidence and the distinction between accepted, recommended, and open items.
+- Topic docs (catalogs, protocols) in the root, linked from README.
+- `deck/`: decision-deck output.
+- `inputs/`: files the user provides. `poc/`: proofs of concept.
+- `briefs/<unit>-<step>.md`: one per subagent task, linking the relevant docs and decision IDs and giving absolute repo paths. The subagent prompt is only "Read and follow the brief at <absolute path>".
+- `research/NN-topic.md`: one report per subagent, the only file it may write. Subagents don't edit the core docs; you do.
 
-The planning workspace is intentionally ignored. Its creation or revision alone does not authorize production edits, tests, device work, commits, pushes, releases, or pull requests.
-You are not allowed to read or modify other created workspaces unless you ask user and get explicit authorization.
+Never put workspace artifacts in `/tmp`.
+
+## Resume
+
+Read README → AGENTS → PLAN → the tail of NOTES → the relevant DECISIONS. Check `git status` and `git log` against PLAN's status rows and fix drift. Ensure the memory pointer.
+
+## Sync
+
+Keep the workspace current without being asked:
+
+- When a decision is accepted or supersedes another, update in the same step every artifact that states the old position: ARCHITECTURE, PLAN, README's Current state, decks, and the Jira ticket if the workspace tracks one. Log the sync in NOTES.
+- When you commit implementation work, set the PLAN row's status and commit hash in the same step.
+
+## Other workspaces
+
+Read them read-only when relevant. Modify one only with the user's OK, except to mark it superseded. Shared kits such as `deck-kit/` are exempt.
+
+To split or supersede a workspace within the same arc: put "Superseded by `<new>` on <date>" at the top of the old README, link the old workspace from the new README, and point the memory entry at the new one.
+
+## Memory
+
+If your harness has persistent memory, keep one entry pointing to the workspace path. If an entry points to a workspace that no longer exists, tell the user; don't follow or delete it silently.

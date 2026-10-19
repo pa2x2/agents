@@ -1,25 +1,27 @@
 # [Feature title] Workspace
 
-This workspace governs the discussion, design, and implementation of [feature title] in [repository or project].
+[Repository or project] · created [date] by [harness]
 
-## Initial request
+## Request
 
-> [verbatim user request]
+> [Verbatim user request, or a summary of the discussion that led to the workspace]
 
 ## Scope
 
-- [Initial goal]
+- [Goal]
 
-## Explicitly out of scope
+## Out of scope
 
-- [Known exclusion or "None confirmed yet"]
+- [Exclusion, or "None confirmed yet"]
 
-## Current status
+## Current state
 
-- Workspace created on [date] by [harness].
-- The initial documents contain assumptions that require repository inspection and user review.
-- Workspace creation does not authorize production, test, device, commit, or external changes.
+- [The live design and where work stands, in a few bullets]
 
-Read [AGENTS.md](AGENTS.md) before related work. Use [ARCHITECTURE.md](ARCHITECTURE.md) for ownership and data-flow evidence, [DECISIONS.md](DECISIONS.md) for accepted and open choices, [PLAN.md](PLAN.md) for execution units, and [NOTES.md](NOTES.md) for dated findings.
+## Documents
 
-This directory is intentionally ignored by the project worktree. It is a durable agent planning workspace, not product source and not a Git worktree.
+- [AGENTS.md](AGENTS.md): task rules
+- [ARCHITECTURE.md](ARCHITECTURE.md): ownership and data flow
+- [DECISIONS.md](DECISIONS.md): accepted, recommended and open choices
+- [PLAN.md](PLAN.md): units, status and commits
+- [NOTES.md](NOTES.md): dated log
