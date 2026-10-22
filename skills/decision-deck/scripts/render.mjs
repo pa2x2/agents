@@ -17,7 +17,8 @@
 //
 // Needs Node 22+ (global fetch and WebSocket). Looks for chromium, chrome, brave or edge; set
 // DECK_BROWSER to the browser's executable if it isn't found. DECK_SIZE sets the viewport
-// (default 1600x1000), DECK_SCALE the pixel ratio (default 1; 2 for sharp crops).
+// (default 1600x1000), DECK_SCALE the pixel ratio (default 1; 2 for sharp crops), DECK_THEME the
+// system theme the deck follows (light or dark; default light).
 import { execFileSync, spawn } from "node:child_process";
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -32,6 +33,7 @@ if (!url || !outDir) {
 process.stdout.on("error", () => {});
 const [width, height] = (process.env.DECK_SIZE ?? "1600x1000").split("x").map(Number);
 const scale = Number(process.env.DECK_SCALE ?? 1);
+const theme = process.env.DECK_THEME ?? "light";
 
 const onPath = (name) => {
   try { execFileSync("which", [name], { stdio: "ignore" }); return true; } catch { return false; }
@@ -102,6 +104,8 @@ await send("Runtime.enable");
 await send("Log.enable");
 await send("Page.enable");
 await send("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: scale, mobile: false });
+// The profile is new, so the deck's theme setting is on Auto and follows this.
+await send("Emulation.setEmulatedMedia", { features: [{ name: "prefers-color-scheme", value: theme }] });
 await send("Page.navigate", { url });
 for (let i = 0; i < 50 && (await evaluate("document.readyState")) !== "complete"; i++) await sleep(100);
 await evaluate("document.fonts.ready.then(() => true)");

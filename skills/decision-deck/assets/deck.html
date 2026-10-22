@@ -6,8 +6,17 @@
 <link rel="icon" href="data:," />
 <title>Decisions</title>
 <style>
+/* The theme is set on <html> as data-theme="light" or "dark" (see the script below), so visuals.css can
+   adapt with [data-theme=dark] or use these variables for diagrams that should follow it. */
 :root {
-  --page: #eceef1; --page-card: #ffffff; --page-text: #16181d; --page-muted: #5d6470; --accent: #16181d; --hl: #f59e0b;
+  color-scheme: light;
+  --page: #eceef1; --page-card: #ffffff; --page-text: #16181d; --page-muted: #5d6470; --accent: #16181d; --accent-text: #ffffff;
+  --raised: #eceef1; --keep: #178a4f; --change: #a86a00; --drop: #c62b27; --hl: #f59e0b;
+}
+:root[data-theme=dark] {
+  color-scheme: dark;
+  --page: #131519; --page-card: #1d2026; --page-text: #e6e8ec; --page-muted: #9aa1ac; --accent: #e6e8ec; --accent-text: #131519;
+  --raised: #30343c; --keep: #45c486; --change: #e8b03a; --drop: #f0605c;
 }
 
 * { box-sizing: border-box; }
@@ -21,7 +30,7 @@ body { margin: 0; overflow: hidden; background: var(--page); color: var(--page-t
 .dk-top h1 { font-size: 16px; margin: 0; flex: 1; font-weight: 600; }
 .dk-top label { font-size: 14px; color: var(--page-muted); display: flex; gap: 6px; align-items: center; cursor: pointer; }
 .dk-btn { font: inherit; font-size: 14px; border-radius: 999px; padding: 7px 16px; border: 1px solid transparent;
-  cursor: pointer; background: var(--accent); color: #fff; }
+  cursor: pointer; background: var(--accent); color: var(--accent-text); }
 .dk-btn.dk-ghost { background: transparent; color: var(--page-text); border-color: color-mix(in srgb, var(--page-muted) 40%, transparent); }
 .dk-btn:disabled { opacity: .35; cursor: default; }
 
@@ -41,8 +50,8 @@ body { margin: 0; overflow: hidden; background: var(--page); color: var(--page-t
 .dk-dots button { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700;
   background: color-mix(in srgb, var(--page-muted) 18%, transparent); color: var(--page-muted); padding: 0; }
 .dk-dots button.dk-on { border-color: var(--page-text); color: var(--page-text); }
-.dk-dots button.dk-keep { background: #1fa46333; color: #178a4f; } .dk-dots button.dk-change { background: #e5a50a33; color: #a86a00; }
-.dk-dots button.dk-drop { background: #e02e2a33; color: #c62b27; }
+.dk-dots button.dk-keep { background: #1fa46333; color: var(--keep); } .dk-dots button.dk-change { background: #e5a50a33; color: var(--change); }
+.dk-dots button.dk-drop { background: #e02e2a33; color: var(--drop); }
 .dk-counter { font-size: 13px; color: var(--page-muted); min-width: 120px; text-align: center; }
 .dk-hintkeys { position: fixed; right: 24px; bottom: 18px; font-size: 12.5px; color: var(--page-muted); z-index: 51; }
 .dk-hintkeys kbd { font-family: inherit; font-size: 12px; border: 1px solid color-mix(in srgb, var(--page-muted) 45%, transparent); border-bottom-width: 2px;
@@ -55,6 +64,7 @@ body { margin: 0; overflow: hidden; background: var(--page); color: var(--page-t
 /* Kind badges take their colour from --h, a hue set per kind in DECK.kinds. */
 .dk-kind { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; border-radius: 6px; padding: 3px 8px; display: inline-block;
   background: hsl(var(--h) 85% 92%); color: hsl(var(--h) 70% 30%); }
+[data-theme=dark] .dk-kind { background: hsl(var(--h) 35% 22%); color: hsl(var(--h) 75% 78%); }
 .dk-side h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--page-muted); margin: 20px 0 6px; }
 .dk-side ul { margin: 0; padding-left: 18px; } .dk-side li { font-size: 14px; line-height: 1.5; margin: 0 0 5px; }
 .dk-refs { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--page-muted); margin-top: 8px; line-height: 1.5; }
@@ -64,9 +74,9 @@ body { margin: 0; overflow: hidden; background: var(--page); color: var(--page-t
 .dk-seg { display: inline-flex; background: color-mix(in srgb, var(--page-muted) 14%, transparent); border-radius: 999px; padding: 3px; gap: 2px; }
 .dk-seg input { display: none; }
 .dk-seg label { font-size: 14px; padding: 6px 16px; border-radius: 999px; cursor: pointer; color: var(--page-muted); }
-.dk-seg input:checked + label { background: var(--page); color: var(--page-text); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
-.dk-seg input[value=keep]:checked + label { color: #178a4f; } .dk-seg input[value=drop]:checked + label { color: #c62b27; }
-.dk-seg input[value=change]:checked + label { color: #a86a00; }
+.dk-seg input:checked + label { background: var(--raised); color: var(--page-text); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+.dk-seg input[value=keep]:checked + label { color: var(--keep); } .dk-seg input[value=drop]:checked + label { color: var(--drop); }
+.dk-seg input[value=change]:checked + label { color: var(--change); }
 .dk-variant { display: flex; flex-direction: column; gap: 6px; }
 .dk-variant .dk-q { font-size: 14px; font-weight: 600; }
 .dk-variant label { font-size: 14px; display: flex; gap: 8px; align-items: baseline; cursor: pointer; line-height: 1.4; }
@@ -75,7 +85,7 @@ textarea.dk-note { width: 100%; min-height: 64px; resize: vertical; font: inheri
   background: var(--page); color: var(--page-text); border: 1px solid color-mix(in srgb, var(--page-muted) 30%, transparent); }
 /* "Change" with no note leaves the change unsaid; the box asks for it. */
 textarea.dk-note.dk-want { border: 2px solid #e5a50a; }
-textarea.dk-note.dk-want::placeholder { color: #a86a00; }
+textarea.dk-note.dk-want::placeholder { color: var(--change); }
 
 .dk-shots { display: flex; flex-wrap: nowrap; gap: 26px; align-items: flex-start; }
 .dk-shot { margin: 0; }
@@ -94,14 +104,14 @@ textarea.dk-note.dk-want::placeholder { color: #a86a00; }
 .dk-toc button:hover { outline: 2px solid color-mix(in srgb, var(--page-muted) 30%, transparent); }
 .dk-toc button .dk-kind { margin-left: auto; }
 .dk-toc button .dk-state { font-size: 12px; font-weight: 700; width: 64px; text-align: right; text-transform: uppercase; }
-.dk-state.dk-keep { color: #178a4f; } .dk-state.dk-change { color: #a86a00; } .dk-state.dk-drop { color: #c62b27; } .dk-state.dk-undecided { color: var(--page-muted); font-weight: 500; }
+.dk-state.dk-keep { color: var(--keep); } .dk-state.dk-change { color: var(--change); } .dk-state.dk-drop { color: var(--drop); } .dk-state.dk-undecided { color: var(--page-muted); font-weight: 500; }
 .dk-smalls { margin-top: 20px; display: flex; flex-direction: column; gap: 14px; max-width: 960px; }
 .dk-small { display: grid; grid-template-columns: 1fr auto; gap: 10px 22px; padding: 16px 18px; border-radius: 16px; background: var(--page-card); }
 .dk-small p { margin: 0; font-size: 14.5px; line-height: 1.5; }
 .dk-small p .dk-stitle { display: block; font-weight: 700; font-size: 15.5px; margin-bottom: 3px; }
 .dk-small textarea { grid-column: 1 / -1; min-height: 44px; }
 .dk-small.dk-checked { grid-template-columns: 1fr; }
-.dk-state.dk-noted { color: #a86a00; }
+.dk-state.dk-noted { color: var(--change); }
 .dk-summary textarea { width: 100%; height: 34vh; font-family: ui-monospace, monospace; font-size: 13px; border-radius: 14px; padding: 14px;
   background: var(--page-card); color: var(--page-text); border: 1px solid color-mix(in srgb, var(--page-muted) 30%, transparent); margin-top: 18px; }
 .dk-summary .dk-row { display: flex; gap: 12px; align-items: center; margin-top: 12px; }
@@ -125,11 +135,25 @@ body.dk-nohl .hl { outline: none; } body.dk-nohl .hl::after { display: none; }
   background: #c62b27; color: #fff; font-size: 13px; white-space: pre-wrap; }
 </style>
 <link rel="stylesheet" href="visuals.css" />
+<script>
+// The theme is a viewer's preference, so it is kept under one key for every deck, apart from the
+// answers. "auto" follows the system. Set here, before the body renders, so the page doesn't flash.
+const THEME_KEY = "decision-deck:theme";
+const darkQuery = matchMedia("(prefers-color-scheme: dark)");
+const themePref = () => localStorage.getItem(THEME_KEY) ?? "auto";
+const applyTheme = () => {
+  const pref = themePref();
+  document.documentElement.dataset.theme = pref === "auto" ? (darkQuery.matches ? "dark" : "light") : pref;
+};
+applyTheme();
+darkQuery.addEventListener("change", applyTheme);
+</script>
 </head>
 <body>
 <div class="dk-top">
   <h1 id="deckTitle"></h1>
   <label><input type="checkbox" id="hlToggle" checked autocomplete="off" /> Highlight changes</label>
+  <button class="dk-btn dk-ghost" id="themeBtn"></button>
   <button class="dk-btn dk-ghost" id="resetBtn">Reset answers</button>
   <button class="dk-btn" id="exportBtn">Export decisions</button>
 </div>
@@ -382,6 +406,16 @@ document.getElementById("hlToggle").onchange = (e) => {
   setHighlight(e.target.checked);
   localStorage.setItem(HL_KEY, e.target.checked ? "on" : "off");
   e.target.blur();
+};
+const THEMES = ["auto", "light", "dark"];
+const themeBtn = document.getElementById("themeBtn");
+const showTheme = () => { const t = themePref(); themeBtn.textContent = `Theme: ${t[0].toUpperCase() + t.slice(1)}`; };
+showTheme();
+themeBtn.onclick = () => {
+  localStorage.setItem(THEME_KEY, THEMES[(THEMES.indexOf(themePref()) + 1) % THEMES.length]);
+  applyTheme();
+  showTheme();
+  themeBtn.blur();
 };
 go(current);
 </script>
