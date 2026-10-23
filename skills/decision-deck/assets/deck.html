@@ -292,6 +292,20 @@ for (const el of document.querySelectorAll("[data-id]")) {
     else if (el.type === "radio") { showVariantShots(id); fit(); }
   });
 }
+// Clicking the selected decision again clears it back to undecided. A click on an already checked radio
+// fires no change event, and click runs before change, so the state still holds the old answer here.
+for (const el of document.querySelectorAll('input[data-f="decision"]')) {
+  el.addEventListener("click", () => {
+    const id = el.dataset.id;
+    if (decisionOf(id) !== el.value) return;
+    el.checked = false;
+    delete state[id].decision;
+    save();
+    markEmptyChangeNote(id);
+    renderNav();
+    el.blur();
+  });
+}
 for (const p of P) { showVariantShots(p.id); markEmptyChangeNote(p.id); }
 for (const s of small) markEmptyChangeNote(s.id);
 
