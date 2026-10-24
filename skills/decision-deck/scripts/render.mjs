@@ -5,8 +5,8 @@
 // Without steps it shoots every slide, and on slides with variants every option of each variant,
 // with the slide's other variants on their proposed option. A step is { name, hash?, eval? }: go to
 // slide number <hash>, optionally run JS (its result is printed), and save <out dir>/<name>.png. For each
-// shot it prints the scale the deck fitted the visuals to; then it prints any page errors and exits
-// with 1 if there were some.
+// shot it prints the scale the deck fitted the visuals to and any visual that clips its content with
+// overflow hidden; then it prints any page errors and exits with 1 if there were some.
 //
 // Controls, for steps that test them (<id> is a slide's or small fix's id, <key> a variant's key):
 //   decide:        document.querySelector('label[for="<id>-keep"]').click()   (or -change, -drop)
@@ -129,6 +129,28 @@ const steps = stepsJson ? JSON.parse(stepsJson) : (await evaluate(`(() => {
   return steps;
 })()`)) ?? [];
 
+// Visible elements in the slide's visuals that hide part of their content: overflow hidden or clip
+// with more content than fits. A clipped code line or label looks finished in a screenshot, so it's
+// easy to miss by eye. Ellipsis and line-clamp are left out, since they show that they cut.
+const CLIPPED = `(() => {
+  const shots = document.querySelector(".dk-slide.dk-on .dk-shots");
+  if (!shots) return [];
+  const out = [];
+  for (const el of shots.querySelectorAll("*")) {
+    if (!el.getClientRects().length) continue;
+    const cs = getComputedStyle(el);
+    if (cs.textOverflow === "ellipsis" || cs.webkitLineClamp !== "none") continue;
+    const clips = (o) => o === "hidden" || o === "clip";
+    const x = clips(cs.overflowX) ? el.scrollWidth - el.clientWidth : 0;
+    const y = clips(cs.overflowY) ? el.scrollHeight - el.clientHeight : 0;
+    if (x <= 1 && y <= 1) continue;
+    const name = el.tagName.toLowerCase() + [...el.classList].map((c) => "." + c).join("");
+    const text = el.textContent.replace(/\\s+/g, " ").trim().slice(0, 50);
+    out.push(name + " hides " + [x > 1 && x + "px across", y > 1 && y + "px down"].filter(Boolean).join(" and ") + (text ? ': "' + text + '"' : ""));
+  }
+  return out;
+})()`;
+
 mkdirSync(outDir, { recursive: true });
 for (const step of steps) {
   if (step.hash !== undefined) await evaluate(`location.hash = "#${step.hash}"`);
@@ -136,9 +158,11 @@ for (const step of steps) {
   const result = step.eval ? await evaluate(step.eval) : undefined;
   await sleep(250);
   const zoom = await evaluate(`(() => { const s = document.querySelector(".dk-slide.dk-on .dk-shots"); return s ? Math.round(parseFloat(s.style.zoom || 1) * 100) : null; })()`);
+  const clipped = await evaluate(CLIPPED);
   const shot = await send("Page.captureScreenshot", { format: "png" });
   writeFileSync(join(outDir, `${step.name}.png`), Buffer.from(shot.result.data, "base64"));
   console.log(`${step.name}.png${zoom !== null ? `  visuals at ${zoom}%` : ""}${result !== undefined ? `  → ${JSON.stringify(result)}` : ""}`);
+  for (const c of clipped ?? []) console.log(`  clipped: ${c}`);
 }
 
 ws.close();
