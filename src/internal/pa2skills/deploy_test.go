@@ -272,3 +272,28 @@ func TestStatusClassifiesInstallations(t *testing.T) {
 		t.Fatalf("statuses after source change = %v", got)
 	}
 }
+
+func TestPromptConflictAcceptsShortcuts(t *testing.T) {
+	cases := map[string]ConflictPolicy{
+		"o\n":             ConflictOverwrite,
+		"O\n":             ConflictOverwrite,
+		"overwrite\n":     ConflictOverwrite,
+		"a\n":             ConflictAllOverwrite,
+		"all-overwrite\n": ConflictAllOverwrite,
+		"s\n":             ConflictSkip,
+		"x\ns\n":          ConflictSkip,
+	}
+	for input, want := range cases {
+		manager := Manager{Stdin: strings.NewReader(input), Stdout: &bytes.Buffer{}}
+		got, err := manager.promptConflict("conflict", "target", "source", "cancelled")
+		if err != nil || got != want {
+			t.Errorf("input %q: got %q, %v; want %q", input, got, err, want)
+		}
+	}
+	for _, input := range []string{"q\n", "quit\n", "\n"} {
+		manager := Manager{Stdin: strings.NewReader(input), Stdout: &bytes.Buffer{}}
+		if _, err := manager.promptConflict("conflict", "target", "source", "cancelled"); err == nil || err.Error() != "cancelled" {
+			t.Errorf("input %q: err = %v, want cancelled", input, err)
+		}
+	}
+}

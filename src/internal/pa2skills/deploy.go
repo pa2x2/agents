@@ -328,30 +328,7 @@ func (m Manager) resolveConflict(installation Installation, source string, polic
 	if !isTerminal(m.Stdin) {
 		return "", fmt.Errorf("%s has local and remote changes; re-run with --conflict=overwrite or --conflict=skip", installation.Target)
 	}
-	reader := bufio.NewReader(m.Stdin)
-	for {
-		fmt.Fprintf(m.Stdout, "%s has changed since pa2-skills last wrote it.\n> diff / overwrite / all-overwrite / skip / quit\n", installation.Target)
-		choice, err := reader.ReadString('\n')
-		if err != nil && !errors.Is(err, io.EOF) {
-			return "", err
-		}
-		switch strings.TrimSpace(choice) {
-		case "diff":
-			if err := showDiff(m.Stdout, installation.Target, source); err != nil {
-				return "", err
-			}
-		case "overwrite":
-			return ConflictOverwrite, nil
-		case "all-overwrite":
-			return ConflictAllOverwrite, nil
-		case "skip":
-			return ConflictSkip, nil
-		case "quit", "":
-			return "", errors.New("update cancelled")
-		default:
-			fmt.Fprintln(m.Stdout, "Choose diff, overwrite, all-overwrite, skip, or quit.")
-		}
-	}
+	return m.promptConflict(installation.Target+" has changed since pa2-skills last wrote it.", installation.Target, source, "update cancelled")
 }
 
 func (m Manager) resolveUnmanagedConflict(target, source string, policy ConflictPolicy) (ConflictPolicy, error) {
@@ -361,28 +338,34 @@ func (m Manager) resolveUnmanagedConflict(target, source string, policy Conflict
 	if !isTerminal(m.Stdin) {
 		return "", fmt.Errorf("%s exists but has no private pa2-skills state; re-run with --conflict=overwrite or --conflict=skip", target)
 	}
+	return m.promptConflict(target+" exists but was not installed by this machine.", target, source, "installation cancelled")
+}
+
+// promptConflict asks how to handle a conflicting target. Each choice can be
+// typed in full or by the shortcut letter shown in brackets.
+func (m Manager) promptConflict(message, target, source, cancelled string) (ConflictPolicy, error) {
 	reader := bufio.NewReader(m.Stdin)
 	for {
-		fmt.Fprintf(m.Stdout, "%s exists but was not installed by this machine.\n> diff / overwrite / all-overwrite / skip / quit\n", target)
+		fmt.Fprintf(m.Stdout, "%s\n> [d]iff / [o]verwrite / [a]ll-overwrite / [s]kip / [q]uit\n", message)
 		choice, err := reader.ReadString('\n')
 		if err != nil && !errors.Is(err, io.EOF) {
 			return "", err
 		}
-		switch strings.TrimSpace(choice) {
-		case "diff":
+		switch strings.ToLower(strings.TrimSpace(choice)) {
+		case "d", "diff":
 			if err := showDiff(m.Stdout, target, source); err != nil {
 				return "", err
 			}
-		case "overwrite":
+		case "o", "overwrite":
 			return ConflictOverwrite, nil
-		case "all-overwrite":
+		case "a", "all-overwrite":
 			return ConflictAllOverwrite, nil
-		case "skip":
+		case "s", "skip":
 			return ConflictSkip, nil
-		case "quit", "":
-			return "", errors.New("installation cancelled")
+		case "q", "quit", "":
+			return "", errors.New(cancelled)
 		default:
-			fmt.Fprintln(m.Stdout, "Choose diff, overwrite, all-overwrite, skip, or quit.")
+			fmt.Fprintln(m.Stdout, "Choose d(iff), o(verwrite), a(ll-overwrite), s(kip), or q(uit).")
 		}
 	}
 }
