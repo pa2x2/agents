@@ -58,7 +58,9 @@ func UpdateBinary(currentVersion string, checkOnly bool, progress io.Writer) (st
 		return fmt.Sprintf("already current at %s", currentVersion), "", nil
 	}
 	if comparison, comparable := compareReleaseVersions(latest, currentVersion); comparable && comparison <= 0 {
-		return fmt.Sprintf("already current at %s (latest release is %s)", currentVersion, latest), "", nil
+		// GitHub can keep reporting the previous release as latest for a
+		// short while after a new one is published.
+		return fmt.Sprintf("already current at %s (newer than %s, which GitHub still reports as the latest release)", currentVersion, latest), "", nil
 	}
 	if checkOnly {
 		return fmt.Sprintf("upgrade available: %s -> %s", currentVersion, latest), "", nil
