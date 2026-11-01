@@ -2,18 +2,21 @@
 //
 //   node render.mjs <deck URL> <out dir> [steps JSON]
 //
-// Without steps it shoots every slide, and on slides with variants every option of each variant,
-// with the slide's other variants on their proposed option. A step is { name, hash?, eval? }: go to
-// slide number <hash>, optionally run JS (its result is printed), and save <out dir>/<name>.png. For each
-// shot it prints the scale the deck fitted the visuals to and any visual that clips its content with
-// overflow hidden; then it prints any page errors and exits with 1 if there were some.
+// Without steps it shoots every slide in its proposed state, then each option of every radio group, each
+// value of every select and each box of every checkbox group on its own, with the slide's other answers
+// reset to their proposed state first, so each shot shows one change. Text, number and range fields are
+// only shown as proposed. A step is { name, hash?, eval? }: go to slide number <hash>, optionally run JS (its
+// result is printed), and save <out dir>/<name>.png. For each shot it prints the scale the deck fitted the
+// visuals to and any visual that clips its content with overflow hidden; then it prints any page errors and
+// exits with 1 if there were some.
 //
-// Controls, for steps that test them (<id> is a slide's or small fix's id, <key> a variant's key):
+// Controls, for steps that test them (<id> is a slide's or data-decision's id, <key> an answer's key):
 //   decide:        document.querySelector('label[for="<id>-keep"]').click()   (or -change, -drop)
-//   pick option:   document.querySelector('input[name="<id>-<key>"][value="<option>"]').click()
-//   slide's dot:   document.querySelector('.dk-dots [data-go="N"]').className   (dk-keep, dk-change, ...)
-//   export text:   document.getElementById("exportText").value   (filled on the last slide)
-// e.g. '[{"name":"keep","hash":1,"eval":"document.querySelector(\"label[for=p1-keep]\").click(); document.querySelectorAll(\".dk-dots button\")[0].className"}]'
+//   answer:        __dkPick(<slide index from 0>, "<key>", <option index>)     (clicks a radio or box, sets a select)
+//   reset:         __dkReset(<slide index from 0>)                             (back to the proposed answers)
+//   slide's dot:   document.querySelector('.dk-dots [data-go="N"]').className  (dk-keep, dk-change, ...)
+//   export text:   document.getElementById("exportText").value                 (filled on the last slide)
+// e.g. '[{"name":"keep","hash":1,"eval":"document.querySelector(\"label[for=save-keep]\").click()"}]'
 //
 // Needs Node 22+ (global fetch and WebSocket). Looks for chromium, chrome, brave or edge; set
 // DECK_BROWSER to the browser's executable if it isn't found. DECK_SIZE sets the viewport
@@ -110,24 +113,59 @@ await send("Page.navigate", { url });
 for (let i = 0; i < 50 && (await evaluate("document.readyState")) !== "complete"; i++) await sleep(100);
 await evaluate("document.fonts.ready.then(() => true)");
 
-// Default steps: each slide once, or once per variant option on slides with variants.
-const steps = stepsJson ? JSON.parse(stepsJson) : (await evaluate(`(() => {
-  const steps = [];
-  document.querySelectorAll(".dk-slide").forEach((slide, i) => {
-    const base = String(i + 1).padStart(2, "0") + "-" + slide.dataset.key;
-    const groups = {};
-    slide.querySelectorAll(".dk-variant input[type=radio]").forEach((r) => (groups[r.name] ??= []).push(r.value));
-    if (!Object.keys(groups).length) steps.push({ name: base, hash: i + 1 });
-    for (const [name, values] of Object.entries(groups)) for (const value of values) steps.push({
-      name: base + "-" + name.slice(slide.dataset.key.length + 1) + "-" + value, hash: i + 1,
-      // Reset the slide's other variants to their proposed option first, so each shot shows one change.
-      eval: '(() => { const s = document.querySelectorAll(".dk-slide")[' + i + ']; ' +
-        's.querySelectorAll("input[data-default]").forEach((r) => r.click()); ' +
-        's.querySelector(\\'input[name="' + name + '"][value="' + value + '"]\\').click(); })()',
-    });
+// Installs __dkReset and __dkPick for steps, and describes each slide's answers for the default steps. The
+// proposed state is recorded here, before any step changes an answer.
+const described = await evaluate(`(() => {
+  const roots = () => [...document.querySelectorAll(".dk-slide[data-key]")];
+  const groupOf = (root, key) => [...root.querySelectorAll("[data-answer]")].filter((el) => el.dataset.answer === key);
+  const proposed = new Map([...document.querySelectorAll("[data-answer]")].map((el) => [el, el.type === "radio" || el.type === "checkbox" ? el.checked : el.value]));
+  window.__dkReset = (i) => {
+    for (const el of roots()[i].querySelectorAll("[data-answer]")) {
+      const p = proposed.get(el);
+      if (el.type === "radio") { if (p && !el.checked) el.click(); }
+      else if (el.type === "checkbox") { if (el.checked !== p) el.click(); }
+      else if (el.value !== p) {
+        el.value = p;
+        el.dispatchEvent(new Event("input", { bubbles: true }));
+        el.dispatchEvent(new Event("change", { bubbles: true }));
+      }
+    }
+  };
+  window.__dkPick = (i, key, j) => {
+    const group = groupOf(roots()[i], key);
+    if (group[0].tagName === "SELECT") {
+      group[0].selectedIndex = j;
+      group[0].dispatchEvent(new Event("change", { bubbles: true }));
+    } else group[j].click();
+  };
+  return roots().map((root, i) => {
+    const keys = [...new Set([...root.querySelectorAll("[data-answer]")].map((el) => el.dataset.answer))];
+    const groups = keys.map((key) => {
+      const group = groupOf(root, key);
+      if (group[0].tagName === "SELECT") return { key, values: [...group[0].options].map((o) => o.value) };
+      if (group[0].type === "radio" || group[0].type === "checkbox") return { key, values: group.map((el) => el.value) };
+      return { key, values: [] };
+    }).filter((g) => g.values.length);
+    return { i, slide: root.dataset.key, groups };
   });
-  return steps;
-})()`)) ?? [];
+})()`);
+if (!Array.isArray(described)) {
+  await cleanup();
+  console.error(`The deck didn't render: ${described}`);
+  process.exit(2);
+}
+
+const steps = stepsJson ? JSON.parse(stepsJson) : described.flatMap(({ i, slide, groups }) => {
+  const base = String(i + 1).padStart(2, "0") + "-" + slide;
+  const hash = i + 1;
+  return [
+    { name: base, hash, eval: `__dkReset(${i})` },
+    ...groups.flatMap((g) => g.values.map((value, j) => ({
+      name: `${base}-${g.key}-${value}`, hash,
+      eval: `__dkReset(${i}); __dkPick(${i}, ${JSON.stringify(g.key)}, ${j})`,
+    }))),
+  ];
+});
 
 // Visible elements in the slide's visuals that hide part of their content: overflow hidden or clip
 // with more content than fits. A clipped code line or label looks finished in a screenshot, so it's

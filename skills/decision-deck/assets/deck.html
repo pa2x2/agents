@@ -35,57 +35,64 @@ body { margin: 0; overflow: hidden; background: var(--page); color: var(--page-t
 .dk-btn:disabled { opacity: .35; cursor: default; }
 
 .dk-deck { position: fixed; top: 56px; bottom: 56px; left: 0; right: 0; }
-.dk-slide { display: none; position: absolute; inset: 0; padding: 20px 24px 12px; }
-.dk-slide.dk-on { display: grid; grid-template-columns: minmax(330px, 390px) 1fr; gap: 28px; }
+.dk-slide { display: none; position: absolute; inset: 0; padding: 16px 24px 12px; flex-direction: column; gap: 12px; }
+.dk-slide.dk-on { display: flex; }
+/* The summary is a page that scrolls, not a slide with a body. */
 .dk-slide.dk-page.dk-on { display: block; overflow-y: auto; padding: 36px max(24px, calc(50% - 480px)); }
-/* Long words (code identifiers, file paths) wrap instead of scrolling the side sideways; overflow-x
-   clips whatever still can't shrink. */
-.dk-side { overflow-y: auto; overflow-x: hidden; overflow-wrap: anywhere; padding: 4px 8px 12px 2px; min-height: 0; }
-.dk-side pre { white-space: pre-wrap; } .dk-side :is(img, svg, video, table) { max-width: 100%; }
-.dk-stage { display: flex; align-items: center; justify-content: center; overflow: hidden; min-width: 0; min-height: 0; }
-
-.dk-bottom { position: fixed; bottom: 0; left: 0; right: 0; height: 56px; display: flex; align-items: center; justify-content: center; gap: 16px;
-  border-top: 1px solid color-mix(in srgb, var(--page-muted) 20%, transparent); background: var(--page); z-index: 50; }
-.dk-dots { display: flex; gap: 8px; align-items: center; }
-.dk-dots button { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700;
-  background: color-mix(in srgb, var(--page-muted) 18%, transparent); color: var(--page-muted); padding: 0; }
-.dk-dots button.dk-on { border-color: var(--page-text); color: var(--page-text); }
-.dk-dots button.dk-keep { background: #1fa46333; color: var(--keep); } .dk-dots button.dk-change { background: #e5a50a33; color: var(--change); }
-.dk-dots button.dk-drop { background: #e02e2a33; color: var(--drop); }
-.dk-counter { font-size: 13px; color: var(--page-muted); min-width: 120px; text-align: center; }
-.dk-hintkeys { position: fixed; right: 24px; bottom: 18px; font-size: 12.5px; color: var(--page-muted); z-index: 51; }
-.dk-hintkeys kbd { font-family: inherit; font-size: 12px; border: 1px solid color-mix(in srgb, var(--page-muted) 45%, transparent); border-bottom-width: 2px;
-  border-radius: 5px; padding: 0 5px; background: var(--page-card); color: var(--page-text); }
-
-.dk-side header { display: flex; gap: 12px; align-items: flex-start; }
+.dk-head { flex: none; display: flex; gap: 12px; align-items: center; }
+.dk-head h2 { margin: 0; font-size: 20px; line-height: 1.3; }
 .dk-num { font-weight: 700; font-size: 14px; background: var(--page-text); color: var(--page); border-radius: 999px; width: 28px; height: 28px;
-  display: inline-flex; align-items: center; justify-content: center; flex: none; margin-top: 2px; }
-.dk-side h2 { margin: 0; font-size: 20px; line-height: 1.3; }
+  display: inline-flex; align-items: center; justify-content: center; flex: none; }
 /* Kind badges take their colour from --h, a hue set per kind in DECK.kinds. */
 .dk-kind { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; border-radius: 6px; padding: 3px 8px; display: inline-block;
   background: hsl(var(--h) 85% 92%); color: hsl(var(--h) 70% 30%); }
 [data-theme=dark] .dk-kind { background: hsl(var(--h) 35% 22%); color: hsl(var(--h) 75% 78%); }
-.dk-side h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--page-muted); margin: 20px 0 6px; }
-.dk-side ul { margin: 0; padding-left: 18px; } .dk-side li { font-size: 14px; line-height: 1.5; margin: 0 0 5px; }
-.dk-refs { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--page-muted); margin-top: 8px; line-height: 1.5; }
 
-.dk-decide { margin-top: 20px; padding: 16px; border-radius: 16px; background: var(--page-card); display: flex; flex-direction: column; gap: 14px; }
-.dk-decide .dk-lbl { font-size: 12px; font-weight: 700; color: var(--page-muted); text-transform: uppercase; letter-spacing: .06em; margin-bottom: 6px; }
-.dk-seg { display: inline-flex; background: color-mix(in srgb, var(--page-muted) 14%, transparent); border-radius: 999px; padding: 3px; gap: 2px; }
+/* The slide body is free HTML. It scrolls when it is taller than the window. */
+.dk-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; font-size: 14px; line-height: 1.5; padding: 4px 4px 12px 2px; }
+.dk-body h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--page-muted); margin: 20px 0 6px; }
+.dk-body h3:first-child { margin-top: 4px; }
+.dk-body ul { margin: 0; padding-left: 18px; } .dk-body li { margin: 0 0 5px; }
+.dk-body pre { white-space: pre-wrap; } .dk-body :is(img, svg, video, table) { max-width: 100%; }
+/* Text beside visuals: .dk-text is the text column, .dk-stage the visuals column. */
+.dk-split { flex: 1; min-height: 0; display: grid; grid-template-columns: minmax(330px, 390px) 1fr; gap: 28px; }
+.dk-text { min-height: 0; overflow-y: auto; overflow-x: hidden; overflow-wrap: anywhere; padding: 4px 8px 12px 2px; }
+.dk-stage { display: flex; align-items: center; justify-content: center; overflow: hidden; min-width: 0; min-height: 0; }
+.dk-refs { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--page-muted); margin-top: 8px; line-height: 1.5; }
+.dk-hint { font-size: 12.5px; color: var(--page-muted); margin-top: 4px; }
+.dk-lead { font-size: 15px; color: var(--page-muted); }
+
+/* Answer controls a body can use. A question's label is bold, its options follow. */
+.dk-q { font-size: 14px; font-weight: 600; margin: 16px 0 6px; }
+.dk-option { display: flex; gap: 8px; align-items: baseline; font-size: 14px; line-height: 1.4; cursor: pointer; margin: 0 0 6px; }
+.dk-option span i { display: block; font-style: normal; color: var(--page-muted); font-size: 12.5px; }
+.dk-option input { flex: none; margin: 2px 0 0; }
+.dk-body :is(input:not([type=radio]):not([type=checkbox]):not([type=range]):not([type=hidden]), select, textarea) {
+  font: inherit; font-size: 14px; border-radius: 10px; padding: 8px 12px; max-width: 100%; background: var(--page); color: var(--page-text);
+  border: 1px solid color-mix(in srgb, var(--page-muted) 30%, transparent); }
+.dk-body textarea:not(.dk-note) { display: block; width: 100%; min-height: 44px; margin-top: 8px; resize: vertical; }
+.dk-pick { font: inherit; font-size: 13px; border-radius: 999px; padding: 6px 14px; cursor: pointer; background: transparent; color: var(--page-text);
+  border: 1px solid color-mix(in srgb, var(--page-muted) 40%, transparent); }
+.dk-pick[aria-pressed=true] { background: var(--accent); color: var(--accent-text); border-color: transparent; }
+/* A row or card that carries a decision or a note reads as one unit. */
+.dk-body [data-decision], .dk-body .dk-item { background: var(--page-card); border-radius: 16px; padding: 14px 16px; margin-bottom: 12px; }
+.dk-body [data-decision] p, .dk-body .dk-item p { margin: 0; }
+
+.dk-decide { flex: none; display: flex; flex-wrap: wrap; gap: 12px 16px; align-items: flex-start; padding: 12px 14px; border-radius: 16px; background: var(--page-card); }
+.dk-decision { display: flex; flex-wrap: wrap; gap: 10px 14px; align-items: flex-start; margin-top: 12px; }
+.dk-seg { display: inline-flex; flex: none; background: color-mix(in srgb, var(--page-muted) 14%, transparent); border-radius: 999px; padding: 3px; gap: 2px; }
 .dk-seg input { display: none; }
 .dk-seg label { font-size: 14px; padding: 6px 16px; border-radius: 999px; cursor: pointer; color: var(--page-muted); }
 .dk-seg input:checked + label { background: var(--raised); color: var(--page-text); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
 .dk-seg input[value=keep]:checked + label { color: var(--keep); } .dk-seg input[value=drop]:checked + label { color: var(--drop); }
 .dk-seg input[value=change]:checked + label { color: var(--change); }
-.dk-variant { display: flex; flex-direction: column; gap: 6px; }
-.dk-variant .dk-q { font-size: 14px; font-weight: 600; }
-.dk-variant label { font-size: 14px; display: flex; gap: 8px; align-items: baseline; cursor: pointer; line-height: 1.4; }
-.dk-variant label span i { display: block; font-style: normal; color: var(--page-muted); font-size: 12.5px; }
-textarea.dk-note { width: 100%; min-height: 64px; resize: vertical; font: inherit; font-size: 14px; border-radius: 12px; padding: 10px 12px;
+textarea.dk-note { flex: 1 1 240px; min-height: 44px; resize: vertical; font: inherit; font-size: 14px; border-radius: 12px; padding: 10px 12px;
   background: var(--page); color: var(--page-text); border: 1px solid color-mix(in srgb, var(--page-muted) 30%, transparent); }
 /* "Change" with no note leaves the change unsaid; the box asks for it. */
 textarea.dk-note.dk-want { border: 2px solid #e5a50a; }
 textarea.dk-note.dk-want::placeholder { color: var(--change); }
+/* A part tied to an answer can carry its own display, so hiding it has to win over that. */
+.dk-off { display: none !important; }
 
 .dk-shots { display: flex; flex-wrap: nowrap; gap: 26px; align-items: flex-start; }
 .dk-shot { margin: 0; }
@@ -94,28 +101,6 @@ textarea.dk-note.dk-want::placeholder { color: var(--change); }
 .dk-tagnow { background: color-mix(in srgb, var(--page-muted) 22%, transparent); color: var(--page-muted); }
 .dk-tagnew { background: var(--hl); color: #1a1200; }
 .dk-shot figcaption span:last-child { color: var(--page-muted); }
-
-.dk-page h1 { font-size: 34px; margin: 0 0 12px; }
-.dk-page .dk-lead { font-size: 16px; line-height: 1.6; color: var(--page-muted); max-width: 820px; }
-.dk-page .dk-lead b { color: var(--page-text); }
-.dk-toc { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; max-width: 820px; }
-.dk-toc button { font: inherit; text-align: left; display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 14px; border: none;
-  background: var(--page-card); color: var(--page-text); cursor: pointer; font-size: 15.5px; }
-.dk-toc button:hover { outline: 2px solid color-mix(in srgb, var(--page-muted) 30%, transparent); }
-.dk-toc button .dk-kind { margin-left: auto; }
-.dk-toc button .dk-state { font-size: 12px; font-weight: 700; width: 64px; text-align: right; text-transform: uppercase; }
-.dk-state.dk-keep { color: var(--keep); } .dk-state.dk-change { color: var(--change); } .dk-state.dk-drop { color: var(--drop); } .dk-state.dk-undecided { color: var(--page-muted); font-weight: 500; }
-.dk-smalls { margin-top: 20px; display: flex; flex-direction: column; gap: 14px; max-width: 960px; }
-.dk-small { display: grid; grid-template-columns: 1fr auto; gap: 10px 22px; padding: 16px 18px; border-radius: 16px; background: var(--page-card); }
-.dk-small p { margin: 0; font-size: 14.5px; line-height: 1.5; }
-.dk-small p .dk-stitle { display: block; font-weight: 700; font-size: 15.5px; margin-bottom: 3px; }
-.dk-small textarea { grid-column: 1 / -1; min-height: 44px; }
-.dk-small.dk-checked { grid-template-columns: 1fr; }
-.dk-state.dk-noted { color: var(--change); }
-.dk-summary textarea { width: 100%; height: 34vh; font-family: ui-monospace, monospace; font-size: 13px; border-radius: 14px; padding: 14px;
-  background: var(--page-card); color: var(--page-text); border: 1px solid color-mix(in srgb, var(--page-muted) 30%, transparent); margin-top: 18px; }
-.dk-summary .dk-row { display: flex; gap: 12px; align-items: center; margin-top: 12px; }
-.dk-summary .dk-row span { color: var(--page-muted); font-size: 13px; }
 
 /* ---------- change highlight ----------
    .hl is a block wrapper with position: relative for its tag.
@@ -131,6 +116,33 @@ textarea.dk-note.dk-want::placeholder { color: var(--change); }
 .hl[data-tag]::after { content: attr(data-tag); position: absolute; top: -13px; right: -4px; background: var(--hl); color: #1a1200;
   font-size: 10px; font-weight: 700; padding: 1px 6px; border-radius: 8px; z-index: 40; white-space: nowrap; font-family: Helvetica, Arial, sans-serif; }
 body.dk-nohl .hl { outline: none; } body.dk-nohl .hl::after { display: none; }
+
+.dk-page h1 { font-size: 34px; margin: 0 0 12px; }
+.dk-page .dk-lead { font-size: 16px; line-height: 1.6; max-width: 820px; }
+.dk-toc { margin-top: 8px; display: flex; flex-direction: column; gap: 8px; max-width: 820px; }
+.dk-toc button { font: inherit; text-align: left; display: flex; align-items: center; gap: 14px; padding: 12px 16px; border-radius: 14px; border: none;
+  background: var(--page-card); color: var(--page-text); cursor: pointer; font-size: 15.5px; }
+.dk-toc button:hover { outline: 2px solid color-mix(in srgb, var(--page-muted) 30%, transparent); }
+.dk-toc button .dk-kind { margin-left: auto; }
+.dk-toc button .dk-state { font-size: 12px; font-weight: 700; width: 92px; text-align: right; text-transform: uppercase; }
+.dk-state.dk-keep { color: var(--keep); } .dk-state.dk-change { color: var(--change); } .dk-state.dk-drop { color: var(--drop); } .dk-state.dk-undecided { color: var(--page-muted); font-weight: 500; }
+.dk-summary textarea { width: 100%; height: 34vh; font-family: ui-monospace, monospace; font-size: 13px; border-radius: 14px; padding: 14px;
+  background: var(--page-card); color: var(--page-text); border: 1px solid color-mix(in srgb, var(--page-muted) 30%, transparent); margin-top: 18px; }
+.dk-summary .dk-row { display: flex; gap: 12px; align-items: center; margin-top: 12px; }
+.dk-summary .dk-row span { color: var(--page-muted); font-size: 13px; }
+
+.dk-bottom { position: fixed; bottom: 0; left: 0; right: 0; height: 56px; display: flex; align-items: center; justify-content: center; gap: 16px;
+  border-top: 1px solid color-mix(in srgb, var(--page-muted) 20%, transparent); background: var(--page); z-index: 50; }
+.dk-dots { display: flex; gap: 8px; align-items: center; }
+.dk-dots button { width: 26px; height: 26px; border-radius: 50%; border: 2px solid transparent; cursor: pointer; font: inherit; font-size: 11px; font-weight: 700;
+  background: color-mix(in srgb, var(--page-muted) 18%, transparent); color: var(--page-muted); padding: 0; }
+.dk-dots button.dk-on { border-color: var(--page-text); color: var(--page-text); }
+.dk-dots button.dk-keep { background: #1fa46333; color: var(--keep); } .dk-dots button.dk-change { background: #e5a50a33; color: var(--change); }
+.dk-dots button.dk-drop { background: #e02e2a33; color: var(--drop); }
+.dk-counter { font-size: 13px; color: var(--page-muted); min-width: 120px; text-align: center; }
+.dk-hintkeys { position: fixed; right: 24px; bottom: 18px; font-size: 12.5px; color: var(--page-muted); z-index: 51; }
+.dk-hintkeys kbd { font-family: inherit; font-size: 12px; border: 1px solid color-mix(in srgb, var(--page-muted) 45%, transparent); border-bottom-width: 2px;
+  border-radius: 5px; padding: 0 5px; background: var(--page-card); color: var(--page-text); }
 .dk-error { position: fixed; top: 64px; left: 24px; right: 24px; z-index: 100; margin: 0; padding: 12px 16px; border-radius: 12px;
   background: #c62b27; color: #fff; font-size: 13px; white-space: pre-wrap; }
 </style>
@@ -186,90 +198,108 @@ const hl = (tag, html, cls = "", style = "") => {
   return `<${el} class="hl ${cls}" ${tag ? `data-tag="${tag}"` : ""} style="${style}">${html}</${el}>`;
 };
 // kind is "now" (current state) or "new" (proposed). html is any markup: a UI mockup, a diagram,
-// before/after code, a table, a screenshot. when ties the shot to variant options, e.g. { layout: "grid" }:
-// it only shows while that option is selected, so a slide shows one proposed visual at a time.
+// before/after code, a table, a screenshot. when ties the shot to answers, e.g. { layout: "grid" }: it
+// shows only while the answer to layout is grid (for a set: while grid is checked). The same
+// data-when="key=value" on an element inside a shot shows or hides that part.
 const shot = (kind, caption, html, when = null) =>
   `<figure class="dk-shot" ${when ? `data-when="${Object.entries(when).map(([k, v]) => `${k}=${v}`).join("&")}"` : ""}><figcaption><span class="${kind === "now" ? "dk-tagnow" : "dk-tagnew"}">${kind === "now" ? "Now" : "Proposed"}</span><span>${caption}</span></figcaption>${html}</figure>`;
 </script>
 <script src="visuals.js"></script>
 <script src="content.js"></script>
 <script>
-// ---------- rendering + decisions ----------
-// If content.js failed, its error is already on the page and there is nothing to render.
-try { DECK; P; } catch { throw new Error("content.js didn't define DECK and P; see the error above"); }
+// ---------- rendering ----------
+// A missing DECK or SLIDES means content.js failed; its error is already on the page.
+try { DECK; SLIDES; } catch { throw new Error("content.js didn't define DECK and SLIDES; see the error above"); }
 const KEY = DECK.storageKey;
 const state = JSON.parse(localStorage.getItem(KEY) || "{}");
 const save = () => localStorage.setItem(KEY, JSON.stringify(state));
-const decisionOf = (id) => state[id]?.decision ?? "undecided";
+const attr = (s) => String(s ?? "").replace(/[&"<>]/g, (c) => ({ "&": "&amp;", '"': "&quot;", "<": "&lt;", ">": "&gt;" }[c]));
 const kindBadge = (k) => `<span class="dk-kind" style="--h:${DECK.kinds[k]?.hue ?? 220}">${DECK.kinds[k]?.label ?? k}</span>`;
-P.forEach((p, i) => { p.n = i + 1; p.variants ??= []; });
-// SMALL and CHECKED are optional, so a follow-up deck can leave them out.
-const small = typeof SMALL === "undefined" ? [] : SMALL;
-const checked = typeof CHECKED === "undefined" ? [] : CHECKED;
-const smallN = P.length + 1;
-const checkedN = P.length + (small.length ? 1 : 0) + 1;
+
+// Ids name the decisions and the saved answers, so each must be unique in the deck.
+const ids = new Set(["summary"]);
+const claim = (id) => {
+  if (!/^[A-Za-z][\w-]*$/.test(id)) throw new Error(`Bad id "${id}": start with a letter, then letters, digits, - or _`);
+  if (ids.has(id)) throw new Error(`Duplicate id "${id}" in content.js`);
+  ids.add(id);
+  return id;
+};
+SLIDES.forEach((s) => claim(s.id));
 
 const decisionSeg = (id) => `<div class="dk-seg">${["keep", "change", "drop"].map((v) =>
   `<input type="radio" name="${id}-d" id="${id}-${v}" value="${v}" data-id="${id}" data-f="decision"><label for="${id}-${v}">${v[0].toUpperCase() + v.slice(1)}</label>`).join("")}</div>`;
+const noteBox = (id) => `<textarea class="dk-note" data-id="${id}" data-f="note" placeholder="Notes"></textarea>`;
 
-const slides = [...P.map((p) => ({ key: p.id, label: String(p.n), p })),
-  ...(small.length ? [{ key: "small", label: String(smallN) }] : []),
-  ...(checked.length ? [{ key: "checked", label: String(checkedN) }] : []), { key: "summary", label: "✓" }];
-
-document.title = DECK.title;
-document.getElementById("deckTitle").textContent = DECK.title;
-
-let html = "";
-
-for (const p of P) {
-  html += `<section class="dk-slide" data-key="${p.id}"><div class="dk-side">
-    <header><span class="dk-num">${p.n}</span><div><h2>${p.title}</h2><div style="margin-top:6px">${kindBadge(p.kind)}</div></div></header>
-    <h3>Problem</h3><ul>${p.problem.map((x) => `<li>${x}</li>`).join("")}</ul>
-    <h3>Proposal</h3><ul>${p.proposal.map((x) => `<li>${x}</li>`).join("")}</ul>
-    ${p.refs ? `<div class="dk-refs">${p.refs}</div>` : ""}
-    <div class="dk-decide"><div><div class="dk-lbl">Decision</div>${decisionSeg(p.id)}</div>
-    ${p.variants.map((v) => `<div class="dk-variant"><div class="dk-q">${v.q}</div>${v.options.map(([val, label, hint], i) =>
-      `<label><input type="radio" name="${p.id}-${v.key}" value="${val}" data-id="${p.id}" data-f="${v.key}" ${i === 0 ? "data-default" : ""}><span>${label}${i === 0 ? " (proposed)" : ""}${hint ? `<i>${hint}</i>` : ""}</span></label>`).join("")}</div>`).join("")}
-    <div><div class="dk-lbl">Notes</div><textarea class="dk-note" data-id="${p.id}" data-f="note" placeholder="What would you change?"></textarea></div></div>
-  </div><div class="dk-stage"><div class="dk-shots">${p.shots.join("")}</div></div></section>`;
-}
-
-if (small.length) {
-  html += `<section class="dk-slide dk-page" data-key="small"><header style="display:flex;gap:12px;align-items:center"><span class="dk-num">${smallN}</span><h1 style="margin:0;font-size:26px">Small fixes</h1></header>
-    <div class="dk-smalls">${small.map((s) => `<div class="dk-small"><p><span class="dk-stitle">${s.title}</span>${s.text}</p><div>${decisionSeg(s.id)}</div>
-    <textarea class="dk-note" data-id="${s.id}" data-f="note" placeholder="Notes"></textarea></div>`).join("")}</div></section>`;
-}
-
-if (checked.length) {
-  html += `<section class="dk-slide dk-page" data-key="checked"><header style="display:flex;gap:12px;align-items:center"><span class="dk-num">${checkedN}</span><h1 style="margin:0;font-size:26px">Checked, no change proposed</h1></header>
-    <p class="dk-lead">Looked at while preparing this deck and left as it is, for the reason given. Add a note to anything you'd change anyway.</p>
-    <div class="dk-smalls">${checked.map((c) => `<div class="dk-small dk-checked"><p><span class="dk-stitle">${c.title}</span>${c.why}</p>
-    <textarea class="dk-note" data-id="${c.id}" data-f="note" placeholder="Notes"></textarea></div>`).join("")}</div></section>`;
-}
-
+let html = SLIDES.map((s, i) => `<section class="dk-slide" data-key="${s.id}">
+  <div class="dk-head"><span class="dk-num">${i + 1}</span><h2>${s.title}</h2>${s.kind ? kindBadge(s.kind) : ""}</div>
+  <div class="dk-body">${s.body}</div>
+  ${s.decision === false ? "" : `<div class="dk-decide">${decisionSeg(s.id)}${noteBox(s.id)}</div>`}
+</section>`).join("");
 html += `<section class="dk-slide dk-page dk-summary" data-key="summary"><h1>Your decisions</h1>
   <div class="dk-toc" id="toc"></div>
-  <p class="dk-lead">Copy this and paste it back into the chat. Anything left undecided is listed as UNDECIDED. On undecided and dropped slides, only variants you picked are listed.</p>
+  <p class="dk-lead">Copy this and paste it back into the chat. Anything left undecided is listed as UNDECIDED. On undecided and dropped slides, only the answers you changed are listed.</p>
   <textarea id="exportText" readonly></textarea>
   <div class="dk-row"><button class="dk-btn" id="copyBtn">Copy</button><span id="copied"></span></div></section>`;
 document.getElementById("deck").innerHTML = html;
 
-const selectedOption = (p, v) => state[p.id]?.[v.key] ?? v.options[0][0];
+const els = [...document.querySelectorAll(".dk-slide")];
+const slideEl = (id) => document.querySelector(`.dk-slide[data-key="${id}"]`);
+const pages = [...SLIDES, { id: "summary", title: "Your decisions", decision: false }];
+document.title = DECK.title;
+document.getElementById("deckTitle").textContent = DECK.title;
 
-// A shot tied to variant options (shot's when) shows only while all of them are selected.
-function showVariantShots(id) {
-  const p = P.find((x) => x.id === id);
-  if (!p) return;
-  for (const fig of document.querySelectorAll(`.dk-slide[data-key="${id}"] .dk-shot[data-when]`)) {
-    fig.hidden = !fig.dataset.when.split("&").every((pair) => {
-      const [key, val] = pair.split("=");
-      const v = p.variants.find((x) => x.key === key);
-      return v && selectedOption(p, v) === val;
+// Each data-decision element gets the Keep / Change / Drop bar and a note, so one slide can hold many decisions.
+const decisionIds = SLIDES.filter((s) => s.decision !== false).map((s) => s.id);
+for (const s of SLIDES) for (const el of slideEl(s.id).querySelectorAll("[data-decision]")) {
+  decisionIds.push(claim(el.dataset.decision));
+  el.insertAdjacentHTML("beforeend", `<div class="dk-decision">${decisionSeg(el.dataset.decision)}${noteBox(el.dataset.decision)}</div>`);
+}
+// Radios that share a key form one question; the browser only unchecks the others when they share a name.
+for (const s of SLIDES) for (const r of slideEl(s.id).querySelectorAll('input[type="radio"][data-answer]')) r.name ||= `${s.id}--${r.dataset.answer}`;
+
+// ---------- answers ----------
+// An answer is the value of a question: the elements that share a data-answer key. Radios give the checked
+// value, checkboxes a list of checked values, anything else the field's value.
+const groupOf = (root, key) => [...root.querySelectorAll("[data-answer]")].filter((el) => el.dataset.answer === key);
+const keysOf = (root) => [...new Set([...root.querySelectorAll("[data-answer]")].map((el) => el.dataset.answer))];
+function valueOf(group) {
+  const type = group[0].type;
+  if (type === "radio") return group.find((el) => el.checked)?.value ?? null;
+  if (type === "checkbox") return group.filter((el) => el.checked).map((el) => el.value);
+  return group[0].value;
+}
+function applyValue(group, value) {
+  const type = group[0].type;
+  if (type === "radio") group.forEach((el) => (el.checked = el.value === value));
+  else if (type === "checkbox") group.forEach((el) => (el.checked = value.includes(el.value)));
+  else group.forEach((el) => (el.value = value));
+}
+// The export's text for an answer: the option's label for choices, the field's text for values.
+const optionLabel = (el) => el.dataset.option ?? el.closest("label")?.textContent.trim() ?? el.value;
+function shownValue(group) {
+  const el = group[0];
+  if (el.type === "checkbox") return group.filter((x) => x.checked).map(optionLabel);
+  if (el.type === "radio") { const on = group.find((x) => x.checked); return on ? optionLabel(on) : "(none)"; }
+  if (el.tagName === "SELECT") { const o = el.selectedOptions[0]; return o ? (o.dataset.option ?? o.text) : "(empty)"; }
+  return el.value.trim() === "" ? "(empty)" : el.value;
+}
+// data-when="key=value&key2=value2" shows an element only while the slide's answers match.
+function showWhen(root) {
+  for (const el of root.querySelectorAll("[data-when]")) {
+    const on = el.dataset.when.split("&").every((pair) => {
+      const i = pair.indexOf("=");
+      const group = i > 0 ? groupOf(root, pair.slice(0, i)) : [];
+      if (!group.length) return false;
+      const value = valueOf(group);
+      return Array.isArray(value) ? value.includes(pair.slice(i + 1)) : value === pair.slice(i + 1);
     });
+    el.hidden = !on;
+    el.classList.toggle("dk-off", !on);
   }
 }
 
-function markEmptyChangeNote(id) {
+const decisionOf = (id) => state[id]?.decision ?? "undecided";
+function markWant(id) {
   const box = document.querySelector(`textarea.dk-note[data-id="${id}"]`);
   box.dataset.placeholder ??= box.placeholder;
   const want = decisionOf(id) === "change" && !state[id]?.note?.trim();
@@ -277,99 +307,136 @@ function markEmptyChangeNote(id) {
   box.placeholder = want ? "Say what to change" : box.dataset.placeholder;
 }
 
-// Restore saved answers; a variant with no answer yet shows its proposed option.
-for (const el of document.querySelectorAll("[data-id]")) {
-  const saved = state[el.dataset.id]?.[el.dataset.f];
-  if (el.type === "radio") el.checked = saved !== undefined ? saved === el.value : el.hasAttribute("data-default");
-  else if (saved !== undefined) el.value = saved;
-  el.addEventListener(el.type === "radio" ? "change" : "input", () => {
-    const id = el.dataset.id;
-    state[id] ??= {};
-    state[id][el.dataset.f] = el.value;
-    save();
-    markEmptyChangeNote(id);
-    if (el.dataset.f === "decision") renderNav();
-    else if (el.type === "radio") { showVariantShots(id); fit(); }
-  });
+// Restore what the user saved. Then the scripts in the bodies run, so they see the saved answers.
+for (const id of decisionIds) {
+  const saved = state[id] ?? {};
+  if (saved.decision) document.getElementById(`${id}-${saved.decision}`).checked = true;
+  document.querySelector(`textarea.dk-note[data-id="${id}"]`).value = saved.note ?? "";
+  markWant(id);
 }
-// Clicking the selected decision again clears it back to undecided. A click on an already checked radio
-// fires no change event, and click runs before change, so the state still holds the old answer here.
-for (const el of document.querySelectorAll('input[data-f="decision"]')) {
-  el.addEventListener("click", () => {
-    const id = el.dataset.id;
-    if (decisionOf(id) !== el.value) return;
-    el.checked = false;
-    delete state[id].decision;
-    save();
-    markEmptyChangeNote(id);
-    renderNav();
-    el.blur();
-  });
+for (const s of SLIDES) {
+  const root = slideEl(s.id);
+  for (const [key, value] of Object.entries(state[s.id]?.answers ?? {})) {
+    const group = groupOf(root, key);
+    if (group.length) applyValue(group, value);
+  }
 }
-for (const p of P) { showVariantShots(p.id); markEmptyChangeNote(p.id); }
-for (const s of small) markEmptyChangeNote(s.id);
+// Scripts inserted as HTML don't run, so each one is swapped for a live copy.
+for (const s of SLIDES) for (const old of slideEl(s.id).querySelectorAll(".dk-body script")) {
+  const live = document.createElement("script");
+  live.textContent = old.textContent;
+  old.replaceWith(live);
+}
+for (const s of pages) showWhen(slideEl(s.id));
 
+// Answers, decisions and notes are saved as they change. A radio or box that was just clicked blurs, so the
+// arrow keys go on moving slides instead of changing it.
+document.addEventListener("input", onChange);
+document.addEventListener("change", onChange);
+function onChange(e) {
+  const t = e.target;
+  if (t.dataset.answer !== undefined) {
+    const root = t.closest(".dk-slide");
+    const saved = (state[root.dataset.key] ??= {});
+    saved.answers ??= {};
+    saved.answers[t.dataset.answer] = valueOf(groupOf(root, t.dataset.answer));
+    save();
+    showWhen(root);
+    fit();
+  } else if (t.dataset.f === "decision") {
+    (state[t.dataset.id] ??= {}).decision = t.value;
+    save();
+    markWant(t.dataset.id);
+    renderNav();
+  } else if (t.dataset.f === "note") {
+    (state[t.dataset.id] ??= {}).note = t.value;
+    save();
+    markWant(t.dataset.id);
+  }
+  if (t.type === "radio" || t.type === "checkbox") t.blur();
+}
+// Clicking the selected decision again clears it. A click on an already checked radio fires no change event.
+document.addEventListener("click", (e) => {
+  const t = e.target;
+  if (!t.matches?.('input[data-f="decision"]') || decisionOf(t.dataset.id) !== t.value) return;
+  t.checked = false;
+  delete state[t.dataset.id].decision;
+  save();
+  markWant(t.dataset.id);
+  renderNav();
+  t.blur();
+});
+
+// ---------- export ----------
 function exportText() {
   const lines = [`${DECK.title}: decisions`, ""];
   const note = (id) => state[id]?.note?.trim();
-  for (const p of P) {
-    lines.push(`${p.n}. ${p.title}: ${decisionOf(p.id).toUpperCase()}`);
-    for (const v of p.variants) {
-      // An untouched variant on an undecided or dropped proposal is only the preselection, not a choice.
-      if (["undecided", "drop"].includes(decisionOf(p.id)) && state[p.id]?.[v.key] === undefined) continue;
-      const val = selectedOption(p, v);
-      lines.push(`   ${v.q.replace(/[?:]$/, "")}: ${v.options.find((o) => o[0] === val)[1]}`);
+  const indent = (text, pad) => text.replace(/\n/g, `\n${pad}`);
+  SLIDES.forEach((s, i) => {
+    const root = slideEl(s.id);
+    const d = decisionOf(s.id);
+    const decides = s.decision !== false;
+    lines.push(`${i + 1}. ${s.title}${decides ? `: ${d.toUpperCase()}` : ""}`);
+    // Keep and Change list every answer, with the proposed ones. Undecided, dropped and slides without a
+    // decision list only the answers the user changed.
+    const all = decides && (d === "keep" || d === "change");
+    for (const key of keysOf(root)) {
+      if (!all && state[s.id]?.answers?.[key] === undefined) continue;
+      const group = groupOf(root, key);
+      const label = (group[0].dataset.label ?? key).replace(/[?:]$/, "");
+      const shown = shownValue(group);
+      if (Array.isArray(shown)) lines.push(`   ${label}:`, ...(shown.length ? shown.map((v) => `     - ${v}`) : ["     (none)"]));
+      else lines.push(`   ${label}: ${indent(shown, "         ")}`);
     }
-    if (note(p.id)) lines.push(`   Note: ${note(p.id).replace(/\n/g, "\n         ")}`);
-  }
-  if (small.length) lines.push(`${smallN}. Small fixes`);
-  for (const s of small) {
-    lines.push(`   - ${s.title}: ${decisionOf(s.id).toUpperCase()}`);
-    if (note(s.id)) lines.push(`     Note: ${note(s.id).replace(/\n/g, "\n           ")}`);
-  }
-  // A checked item has nothing to decide; only the ones the user wrote a note on are listed.
-  const noted = checked.filter((c) => note(c.id));
-  if (noted.length) lines.push(`${checkedN}. Checked, no change proposed`);
-  for (const c of noted) lines.push(`   - ${c.title}\n     Note: ${note(c.id).replace(/\n/g, "\n           ")}`);
+    if (note(s.id)) lines.push(`   Note: ${indent(note(s.id), "         ")}`);
+    for (const el of root.querySelectorAll("[data-decision]")) {
+      const id = el.dataset.decision;
+      lines.push(`   - ${el.dataset.label ?? id}: ${decisionOf(id).toUpperCase()}`);
+      if (note(id)) lines.push(`     Note: ${indent(note(id), "           ")}`);
+    }
+  });
   return lines.join("\n");
 }
 
 // ---------- navigation ----------
-const els = [...document.querySelectorAll(".dk-slide")];
 // #N in the URL, the dots' data-go and the list's data-toc all count slides from 1, like the slide numbers.
 const fromHash = () => (parseInt(location.hash.slice(1), 10) || 1) - 1;
 let current = Math.min(Math.max(fromHash(), 0), els.length - 1);
 
+// The decision a slide shows on its dot and in the list: its own bar, and each data-decision inside it.
+// Nothing is shown when a slide has no decision.
 function slideDecision(s) {
-  if (s.p) return decisionOf(s.p.id);
-  if (s.key === "small") {
-    const d = small.map((x) => decisionOf(x.id));
-    return d.every((x) => x !== "undecided") ? (d.includes("change") ? "change" : d.every((x) => x === "drop") ? "drop" : "keep") : "undecided";
-  }
-  return "undecided";
+  const decisions = [];
+  if (s.decision !== false) decisions.push(decisionOf(s.id));
+  for (const el of slideEl(s.id).querySelectorAll("[data-decision]")) decisions.push(decisionOf(el.dataset.decision));
+  if (!decisions.length) return "";
+  if (decisions.includes("undecided")) return "undecided";
+  if (decisions.includes("change")) return "change";
+  return decisions.every((d) => d === "drop") ? "drop" : "keep";
 }
 
 function renderNav() {
-  document.getElementById("dots").innerHTML = slides.map((s, i) =>
-    `<button class="${i === current ? "dk-on" : ""} dk-${slideDecision(s)}" data-go="${i + 1}" title="${s.p ? s.p.title : s.key}">${s.label}</button>`).join("");
-  const rows = P.map((p) => [p.n, p.title, kindBadge(p.kind), decisionOf(p.id)]);
-  if (small.length) rows.push([smallN, "Small fixes", "", slideDecision(slides[smallN - 1])]);
-  if (checked.length) rows.push([checkedN, "Checked, no change proposed", "", checked.some((c) => state[c.id]?.note?.trim()) ? "noted" : ""]);
-  document.getElementById("toc").innerHTML = rows.map(([n, t, badge, d]) =>
-    `<button data-toc="${n}"><span class="dk-num">${n}</span>${t}<span style="margin-left:auto">${badge}</span><span class="dk-state dk-${d}">${d}</span></button>`).join("");
+  document.getElementById("dots").innerHTML = pages.map((p, i) => {
+    const d = slideDecision(p);
+    return `<button class="${i === current ? "dk-on" : ""} ${d ? `dk-${d}` : ""}" data-go="${i + 1}" title="${attr(p.title)}">${i === pages.length - 1 ? "✓" : i + 1}</button>`;
+  }).join("");
+  document.getElementById("toc").innerHTML = SLIDES.map((s, i) => {
+    const d = slideDecision(s);
+    return `<button data-toc="${i + 1}"><span class="dk-num">${i + 1}</span>${s.title}${s.kind ? `<span style="margin-left:auto">${kindBadge(s.kind)}</span>` : ""}${d ? `<span class="dk-state dk-${d}">${d}</span>` : ""}</button>`;
+  }).join("");
 }
 
-// Scale the visuals so everything on a slide fits the stage without scrolling. Small visuals grow too,
-// up to MAX_ZOOM, so they don't sit in a mostly empty stage on a large window.
+// Scale the visuals so everything in a stage fits without scrolling. Small visuals grow too, up to
+// MAX_ZOOM, so they don't sit in a mostly empty stage on a large window.
 const MAX_ZOOM = 1.4;
 function fit() {
-  const slide = els[current];
-  const shots = slide.querySelector(".dk-shots");
-  if (!shots) return;
-  shots.style.zoom = 1;
-  const stage = slide.querySelector(".dk-stage").getBoundingClientRect();
-  const scale = Math.min(MAX_ZOOM, (stage.width - 8) / shots.scrollWidth, (stage.height - 8) / shots.scrollHeight);
-  shots.style.zoom = scale;
+  for (const shots of els[current].querySelectorAll(".dk-shots")) {
+    shots.style.zoom = 1;
+    const stage = shots.closest(".dk-stage");
+    if (!stage) continue;
+    const box = stage.getBoundingClientRect();
+    shots.style.zoom = Math.min(MAX_ZOOM, (box.width - 8) / shots.scrollWidth, (box.height - 8) / shots.scrollHeight);
+  }
 }
 
 function go(i) {
@@ -379,7 +446,7 @@ function go(i) {
   document.getElementById("counter").textContent = `${current + 1} / ${els.length}`;
   document.getElementById("prevBtn").disabled = current === 0;
   document.getElementById("nextBtn").disabled = current === els.length - 1;
-  if (slides[current].key === "summary") { document.getElementById("exportText").value = exportText(); document.getElementById("copied").textContent = ""; }
+  if (pages[current].id === "summary") { document.getElementById("exportText").value = exportText(); document.getElementById("copied").textContent = ""; }
   renderNav();
   fit();
 }
@@ -391,15 +458,15 @@ document.addEventListener("click", (e) => {
 });
 window.addEventListener("hashchange", () => go(fromHash()));
 document.addEventListener("keydown", (e) => {
-  // The target is document itself when nothing has focus, and document has no .matches().
-  if ((e.target instanceof Element && e.target.matches("textarea, input[type=text]")) || e.altKey || e.ctrlKey || e.metaKey) return;
+  // Keys that edit a field (text, number, range, select, a textarea) stay with it. A radio or box has blurred after a click.
+  const t = e.target;
+  const editing = t instanceof Element && t.matches("textarea, select, input") && !["radio", "checkbox"].includes(t.type);
+  if (editing || e.altKey || e.ctrlKey || e.metaKey) return;
   if (e.key === "ArrowRight" || e.key === "PageDown") { go(current + 1); e.preventDefault(); }
   else if (e.key === "ArrowLeft" || e.key === "PageUp") { go(current - 1); e.preventDefault(); }
   else if (e.key === "Home") go(0);
   else if (e.key === "End") go(els.length - 1);
 });
-// Radios keep focus after a click, and arrow keys would then change the answer instead of the slide.
-document.addEventListener("change", (e) => { if (e.target.type === "radio") e.target.blur(); });
 window.addEventListener("resize", fit);
 document.fonts.ready.then(fit);
 
