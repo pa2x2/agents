@@ -10,12 +10,19 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"syscall"
 	"text/tabwriter"
 
 	"pa2-skills/internal/pa2skills"
 )
 
 var version = "development"
+
+// Overridable in tests.
+var (
+	updateBinary = pa2skills.UpdateBinary
+	execBinary   = syscall.Exec
+)
 
 func main() {
 	if err := run(os.Args[1:], os.Stdin, os.Stdout, os.Stderr); err != nil {
@@ -305,11 +312,20 @@ func updateInstallation(arguments []string, manager pa2skills.Manager, stdout, s
 	}
 	if !*skillsOnly {
 		fmt.Fprintln(stdout, "Binary: checking for updates...")
-		result, err := pa2skills.UpdateBinary(version, *check, stdout)
+		result, updated, err := updateBinary(version, *check, stdout)
 		if err != nil {
 			fmt.Fprintf(stderr, "Binary: check failed: %v\n", err)
 		} else {
 			fmt.Fprintf(stdout, "Binary: %s\n", result)
+		}
+		if updated != "" && !*binOnly {
+			// This process is still the old binary; hand the rest of the
+			// update to the new one so source and skills use the new code.
+			arguments := []string{updated, "update", "--skills-only", "--conflict", *conflict}
+			if err := execBinary(updated, arguments, os.Environ()); err != nil {
+				return fmt.Errorf("start updated binary: %w", err)
+			}
+			return nil
 		}
 	}
 	if *binOnly {
