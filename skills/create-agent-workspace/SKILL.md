@@ -9,6 +9,14 @@ A workspace is the durable record of one feature or change that later sessions r
 
 Creating or editing a workspace doesn't authorize product changes, commits or external actions. When the user asks to start or continue work on a unit, that authorizes that unit.
 
+## Chat
+
+The user doesn't know this workspace's shorthand. In chat:
+
+- Name items by what they are: "the decision to use a shared cache", not `D003`; "the first plan step", not "Unit 0" or "PLAN row".
+- Don't use decision IDs, unit or step codes, "sync", "resume" or "memory pointer" in chat unless the user used them first. Say what happened instead, e.g. "I updated the architecture and plan to match the decision."
+- Expand any internal term the first time you need it. IDs stay in the files, where they keep references stable.
+
 ## Create
 
 1. Root: `git rev-parse --show-toplevel`, or the current directory outside Git.
