@@ -23,6 +23,10 @@ Versions hide in more places than the main manifest:
 - Platform levels: compileSdk, targetSdk, minSdk, NDK, iOS deployment target, framework SDK (Expo SDK, Flutter SDK).
 - Dependencies pinned to a git commit (JitPack, git URLs, forks) and prebuilt binaries checked into the repo, along with the scripts that build them.
 - Shared version knobs. A version that another script also reads (an NDK version that an AAR build script uses) can't be bumped on its own.
+- Every package manifest in the tree, not only the root one.
+- CI configuration: actions pinned by tag or commit SHA, runner, emulator and other types of images, and tool versions set in workflows.
+- Container base images, pinned by tag or digest.
+- Checksum files that pin versions: dependency verification metadata, lockfile integrity hashes, `SHA256` lines in scripts. A version bump must carry the new checksum with it.
 
 Find out what runtime targets exist for testing: connected devices, emulators or simulators (`adb devices`, `emulator -list-avds`, `xcrun simctl list`), browsers, a local server. Some checks in the plan will need them.
 
@@ -130,6 +134,7 @@ Work through the groups the user authorized, in order. Keep each group's changes
 
 - Use exactly the versions in the plan or the user's message. If something newer exists, mention it. Don't quietly go further.
 - Prefer the ecosystem's own tool (`./gradlew wrapper`, `npx expo install --fix`, `cargo update -p`). Then read the whole diff. Generators reset custom settings; the Gradle wrapper task, for example, dropped a deliberate `retries=3`. Restore such settings in a way that survives the next regeneration.
+- Update every checksum that pins the old version, such as verification metadata, lockfile integrity hashes and SHA-256 lines in scripts. Take each new value from the publisher's checksum or signature where one exists, and hash the download yourself to confirm it.
 - Inspect the resolved dependency graph afterwards. Every target version should resolve as intended, nothing else should have moved unexpectedly, and nothing the code imports directly should have disappeared from the graph.
 
 ### Fix what breaks
