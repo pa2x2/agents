@@ -13,7 +13,7 @@ Each slide is one decision: a proposed change, a finding to act on, or a questio
 
 Word every proposal as a change to make, so Keep means "do it" and Drop means "don't". An item that says what won't happen turns Drop into a double negative. Implementation details belong in the plan, not the deck.
 
-Before building the deck, check that the proposals fit together and fit the app as it is. A slide that depends on an earlier slide's choice says which option it assumes. The recommended answers, the small fixes and the later slides must work together. New UI goes on screens and menus that exist, or the slide proposes the new screen and shows how the user gets to it.
+Before building the deck, check that the proposals fit together and fit the app as it is. Every option you offer, not only the recommended one, must be possible: check that the libraries, APIs and platform it relies on support it, and leave out the options that aren't. A slide that depends on an earlier slide's choice says which option it assumes. The recommended answers, the small fixes and the later slides must work together. New UI goes on screens and menus that exist, or the slide proposes the new screen and shows how the user gets to it.
 
 Everything you looked at ends up in the deck: as a slide, as a row in a slide of small fixes (each row gets its own decision), or in a "checked" slide with the reason it stays. The user can add a note to a checked item to change it anyway. If the scope is so large that one deck would be tiring to go through, build several complete decks, one per area. Order the slides so each decision comes before the ones that depend on it.
 
@@ -104,7 +104,5 @@ Read each decision like this:
 - **DROP**: rejected. Don't implement it and don't propose it again. A note may say what to do instead; treat that as the decision, and ask if it's unclear.
 - **UNDECIDED**: still open. Ask about it.
 - A checked item with a note: the user wants it changed after all. Ask, or propose it in a follow-up deck.
-
-Reply in chat with what you understood: the accepted items with their answers and notes, the dropped ones, and your questions about unclear notes and undecided items. Check that each accepted item is actually possible (for example, that a dependency or API it relies on supports it) and say which ones aren't. Then stop. Make no changes to the project until the user explicitly tells you to implement.
 
 When notes ask to see something again or for other options ("try again", "show it with more rows"), or the user asks for another pass, answer with the deck, not with options in chat. Add the new slides or answers to the same deck, keeping existing slide and answer ids unchanged so earlier answers stay. Or build a follow-up deck next to it: copy `index.html` to `round2.html`, point its `content.js` script at `round2.js`, and put only the reopened and new slides in that file, with a new `storageKey`. It reuses `visuals.css`, `visuals.js` and the assets. Check it renders and hand it over as above.
