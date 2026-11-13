@@ -6,17 +6,11 @@
 <link rel="icon" href="data:," />
 <title>Decisions</title>
 <style>
-/* The theme is set on <html> as data-theme="light" or "dark" (see the script below), so visuals.css can
-   adapt with [data-theme=dark] or use these variables for diagrams that should follow it. */
+/* The deck is dark only. visuals.css can use these variables for diagrams that should match it. */
 :root {
-  color-scheme: light;
-  --page: #eceef1; --page-card: #ffffff; --page-text: #16181d; --page-muted: #5d6470; --accent: #16181d; --accent-text: #ffffff;
-  --raised: #eceef1; --keep: #178a4f; --change: #a86a00; --drop: #c62b27; --hl: #f59e0b;
-}
-:root[data-theme=dark] {
   color-scheme: dark;
   --page: #131519; --page-card: #1d2026; --page-text: #e6e8ec; --page-muted: #9aa1ac; --accent: #e6e8ec; --accent-text: #131519;
-  --raised: #30343c; --keep: #45c486; --change: #e8b03a; --drop: #f0605c;
+  --raised: #30343c; --keep: #45c486; --change: #e8b03a; --drop: #f0605c; --hl: #f59e0b;
 }
 
 * { box-sizing: border-box; }
@@ -45,8 +39,7 @@ body { margin: 0; overflow: hidden; background: var(--page); color: var(--page-t
   display: inline-flex; align-items: center; justify-content: center; flex: none; }
 /* Kind badges take their colour from --h, a hue set per kind in DECK.kinds. */
 .dk-kind { font-size: 11px; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; border-radius: 6px; padding: 3px 8px; display: inline-block;
-  background: hsl(var(--h) 85% 92%); color: hsl(var(--h) 70% 30%); }
-[data-theme=dark] .dk-kind { background: hsl(var(--h) 35% 22%); color: hsl(var(--h) 75% 78%); }
+  background: hsl(var(--h) 35% 22%); color: hsl(var(--h) 75% 78%); }
 
 /* The slide body is free HTML. It scrolls when it is taller than the window. */
 .dk-body { flex: 1; min-height: 0; overflow-y: auto; overflow-x: hidden; display: flex; flex-direction: column; font-size: 14px; line-height: 1.5; padding: 4px 4px 12px 2px; }
@@ -147,25 +140,11 @@ body.dk-nohl .hl { outline: none; } body.dk-nohl .hl::after { display: none; }
   background: #c62b27; color: #fff; font-size: 13px; white-space: pre-wrap; }
 </style>
 <link rel="stylesheet" href="visuals.css" />
-<script>
-// The theme is a viewer's preference, so it is kept under one key for every deck, apart from the
-// answers. "auto" follows the system. Set here, before the body renders, so the page doesn't flash.
-const THEME_KEY = "decision-deck:theme";
-const darkQuery = matchMedia("(prefers-color-scheme: dark)");
-const themePref = () => localStorage.getItem(THEME_KEY) ?? "auto";
-const applyTheme = () => {
-  const pref = themePref();
-  document.documentElement.dataset.theme = pref === "auto" ? (darkQuery.matches ? "dark" : "light") : pref;
-};
-applyTheme();
-darkQuery.addEventListener("change", applyTheme);
-</script>
 </head>
 <body>
 <div class="dk-top">
   <h1 id="deckTitle"></h1>
   <label><input type="checkbox" id="hlToggle" checked autocomplete="off" /> Highlight changes</label>
-  <button class="dk-btn dk-ghost" id="themeBtn"></button>
   <button class="dk-btn dk-ghost" id="resetBtn">Reset answers</button>
   <button class="dk-btn" id="exportBtn">Export decisions</button>
 </div>
@@ -487,16 +466,6 @@ document.getElementById("hlToggle").onchange = (e) => {
   setHighlight(e.target.checked);
   localStorage.setItem(HL_KEY, e.target.checked ? "on" : "off");
   e.target.blur();
-};
-const THEMES = ["auto", "light", "dark"];
-const themeBtn = document.getElementById("themeBtn");
-const showTheme = () => { const t = themePref(); themeBtn.textContent = `Theme: ${t[0].toUpperCase() + t.slice(1)}`; };
-showTheme();
-themeBtn.onclick = () => {
-  localStorage.setItem(THEME_KEY, THEMES[(THEMES.indexOf(themePref()) + 1) % THEMES.length]);
-  applyTheme();
-  showTheme();
-  themeBtn.blur();
 };
 go(current);
 </script>

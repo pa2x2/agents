@@ -2,10 +2,9 @@
    A visual of an existing UI should look like that UI: take its colours, fonts and components from
    the project. Diagrams, code and tables can stay plain. The deck's own classes all start with dk-,
    so any other class name is free; v- is only a convention.
-   The deck has a light and a dark theme. A mockup of the app keeps the app's own look in both: set its
-   background and text colour, so it doesn't inherit the deck's text colour. Diagrams, code and tables
-   can follow the theme with the deck's variables (--page-card, --page-text, --page-muted) or adapt
-   under [data-theme=dark]. */
+   The deck is dark. A mockup of the app keeps the app's own look: set its background and text colour,
+   so it doesn't inherit the deck's light text colour. Diagrams, code and tables can match the deck
+   with its variables (--page-card, --page-text, --page-muted). */
 .v-card { position: relative; width: 300px; background: #fff; color: #16181d; border-radius: 12px; box-shadow: 0 8px 24px rgba(0,0,0,.1); overflow: hidden; }
 .v-row { padding: 12px 16px; border-bottom: 1px solid #ddd; }
 .v-btn { display: inline-block; padding: 10px 18px; border-radius: 6px; background: #555; color: #fff; }
