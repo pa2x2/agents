@@ -10,11 +10,15 @@ import (
 	"time"
 )
 
+// Installation is the private record of one deployed item. The name keeps its
+// original "skill" JSON key, and records written before rules existed have no
+// kind, so readInstallation treats them as skills.
 type Installation struct {
 	Version     int       `json:"version"`
 	Scope       string    `json:"scope"`
 	Harness     string    `json:"harness"`
-	Skill       string    `json:"skill"`
+	Kind        Kind      `json:"kind,omitempty"`
+	Name        string    `json:"skill"`
 	ProjectRoot string    `json:"project_root,omitempty"`
 	Target      string    `json:"target"`
 	SourceRef   string    `json:"source_ref"`
@@ -30,11 +34,22 @@ func (p Paths) readInstallation(key string) (Installation, bool, error) {
 	if err != nil {
 		return Installation{}, false, err
 	}
-	var installation Installation
-	if err := json.Unmarshal(contents, &installation); err != nil {
+	installation, err := decodeInstallation(contents)
+	if err != nil {
 		return Installation{}, false, fmt.Errorf("read installation state: %w", err)
 	}
 	return installation, true, nil
+}
+
+func decodeInstallation(contents []byte) (Installation, error) {
+	var installation Installation
+	if err := json.Unmarshal(contents, &installation); err != nil {
+		return Installation{}, err
+	}
+	if installation.Kind == "" {
+		installation.Kind = KindSkill
+	}
+	return installation, nil
 }
 
 func (p Paths) writeInstallation(key string, installation Installation) error {
@@ -46,24 +61,7 @@ func (p Paths) writeInstallation(key string, installation Installation) error {
 	if err != nil {
 		return err
 	}
-	temporary, err := os.CreateTemp(directory, ".installation-")
-	if err != nil {
-		return err
-	}
-	temporaryName := temporary.Name()
-	defer os.Remove(temporaryName)
-	if _, err := temporary.Write(append(contents, '\n')); err != nil {
-		temporary.Close()
-		return err
-	}
-	if err := temporary.Chmod(0o600); err != nil {
-		temporary.Close()
-		return err
-	}
-	if err := temporary.Close(); err != nil {
-		return err
-	}
-	return os.Rename(temporaryName, p.InstallStatePath(key))
+	return writeFileAtomic(p.InstallStatePath(key), append(contents, '\n'), 0o600)
 }
 
 type storedInstallation struct {
@@ -88,16 +86,16 @@ func (p Paths) installations() ([]storedInstallation, error) {
 		if err != nil {
 			return nil, err
 		}
-		var installation Installation
-		if err := json.Unmarshal(contents, &installation); err != nil {
+		installation, err := decodeInstallation(contents)
+		if err != nil {
 			return nil, fmt.Errorf("read installation state %s: %w", entry.Name(), err)
 		}
 		result = append(result, storedInstallation{strings.TrimSuffix(entry.Name(), ".json"), installation})
 	}
 	sort.SliceStable(result, func(i, j int) bool {
 		left, right := result[i].Installation, result[j].Installation
-		if left.Skill != right.Skill {
-			return left.Skill < right.Skill
+		if left.Name != right.Name {
+			return left.Name < right.Name
 		}
 		if left.Scope != right.Scope {
 			return left.Scope > right.Scope
@@ -110,8 +108,8 @@ func (p Paths) installations() ([]storedInstallation, error) {
 	return result, nil
 }
 
-func (p Paths) saveBaseline(source string) (string, error) {
-	hash, err := treeHash(source)
+func (p Paths) saveBaseline(handler kindHandler, source string) (string, error) {
+	hash, err := handler.sourceHash(source)
 	if err != nil {
 		return "", err
 	}
@@ -121,7 +119,7 @@ func (p Paths) saveBaseline(source string) (string, error) {
 	} else if !os.IsNotExist(err) {
 		return "", err
 	}
-	if err := copyTree(source, target); err != nil {
+	if err := handler.saveBaseline(source, target); err != nil {
 		return "", fmt.Errorf("save baseline: %w", err)
 	}
 	return hash, nil

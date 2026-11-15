@@ -3,13 +3,13 @@ package pa2skills
 import (
 	"errors"
 	"fmt"
-	"os"
 )
 
 // Remove deletes managed installations and their private state. Installations with local
-// changes are kept unless force is set; directories pa2-skills did not install are never touched.
-func (m Manager) Remove(skills []string, scope Scope, harnesses []string, force bool) error {
-	if err := ValidateInstallArguments(skills, scope, harnesses, ConflictAsk); err != nil {
+// changes are kept unless force is set; files pa2-skills did not install are never touched.
+// A rule block shared by several harnesses stays until the last of them is removed.
+func (m Manager) Remove(names []string, scope Scope, harnesses []string, force bool) error {
+	if err := ValidateInstallArguments(names, scope, harnesses, ConflictAsk); err != nil {
 		return err
 	}
 	projectRoot, err := m.projectRoot(scope)
@@ -20,9 +20,24 @@ func (m Manager) Remove(skills []string, scope Scope, harnesses []string, force 
 	if err != nil {
 		return err
 	}
-	selectedSkills := map[string]bool{}
-	for _, skill := range skills {
-		selectedSkills[skill] = true
+	selectedNames := map[string]bool{}
+	for _, name := range names {
+		selectedNames[name] = true
+	}
+	// Targets are compared after resolving symlinks, so a CLAUDE.md that links
+	// to AGENTS.md counts as the same file.
+	type deployment struct{ kind, target, name string }
+	deploymentOf := func(installation Installation) (deployment, error) {
+		target, err := resolveSymlink(installation.Target)
+		return deployment{string(installation.Kind), target, installation.Name}, err
+	}
+	trackers := map[deployment]int{}
+	for _, stored := range installations {
+		deployed, err := deploymentOf(stored.Installation)
+		if err != nil {
+			return err
+		}
+		trackers[deployed]++
 	}
 	selectedHarnesses := map[string]bool{}
 	for _, harness := range harnesses {
@@ -34,34 +49,46 @@ func (m Manager) Remove(skills []string, scope Scope, harnesses []string, force 
 		if installation.Scope != string(scope) || installation.ProjectRoot != projectRoot || !selectedHarnesses[installation.Harness] {
 			continue
 		}
-		if !selectedSkills[SkillAll] && !selectedSkills[installation.Skill] {
+		if !selectedNames[NameAll] && !selectedNames[installation.Name] {
 			continue
 		}
-		matched[installation.Skill] = true
-		localHash, err := treeHash(installation.Target)
+		matched[installation.Name] = true
+		handler := handlerFor(installation.Kind)
+		localHash, err := handler.targetHash(installation.Target, installation.Name)
 		if err != nil {
 			return err
 		}
 		if localHash != "" && localHash != installation.Baseline && !force {
-			fmt.Fprintf(m.Stdout, "Kept locally customized %s for %s at %s; re-run with --force to remove it\n", installation.Skill, installation.Harness, installation.Target)
+			fmt.Fprintf(m.Stdout, "Kept locally customized %s for %s at %s; re-run with --force to remove it\n", installation.Name, installation.Harness, installation.Target)
 			continue
 		}
-		if err := os.RemoveAll(installation.Target); err != nil {
-			return fmt.Errorf("remove %s: %w", installation.Target, err)
+		deployed, err := deploymentOf(installation)
+		if err != nil {
+			return err
+		}
+		shared := trackers[deployed] > 1
+		if !shared {
+			if err := handler.remove(installation.Target, installation.Name); err != nil {
+				return fmt.Errorf("remove %s from %s: %w", installation.Name, installation.Target, err)
+			}
 		}
 		if err := m.Paths.removeInstallation(stored.Key); err != nil {
 			return err
 		}
-		if localHash == "" {
-			fmt.Fprintf(m.Stdout, "Stopped tracking missing %s for %s at %s\n", installation.Skill, installation.Harness, installation.Target)
-		} else {
-			fmt.Fprintf(m.Stdout, "Removed %s for %s at %s\n", installation.Skill, installation.Harness, installation.Target)
+		trackers[deployed]--
+		switch {
+		case localHash == "":
+			fmt.Fprintf(m.Stdout, "Stopped tracking missing %s for %s at %s\n", installation.Name, installation.Harness, installation.Target)
+		case shared:
+			fmt.Fprintf(m.Stdout, "Stopped tracking %s for %s; kept it at %s for the other harnesses that use it\n", installation.Name, installation.Harness, installation.Target)
+		default:
+			fmt.Fprintf(m.Stdout, "Removed %s for %s at %s\n", installation.Name, installation.Harness, installation.Target)
 		}
 	}
 	var missing []error
-	for _, skill := range skills {
-		if skill != SkillAll && !matched[skill] {
-			missing = append(missing, fmt.Errorf("%s has no managed %s-scope installation for the selected harnesses", skill, scope))
+	for _, name := range names {
+		if name != NameAll && !matched[name] {
+			missing = append(missing, fmt.Errorf("%s has no managed %s-scope installation for the selected harnesses", name, scope))
 		}
 	}
 	if len(matched) == 0 && len(missing) == 0 {

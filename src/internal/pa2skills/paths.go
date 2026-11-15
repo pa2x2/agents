@@ -66,8 +66,10 @@ func (p Paths) BaselinePath(hash string) string {
 	return filepath.Join(p.BaselinesRoot(), hash)
 }
 
-func projectStateKey(projectRoot, scope, harness, skill string) string {
-	sum := sha256.Sum256([]byte(projectRoot + "\x00" + scope + "\x00" + harness + "\x00" + skill))
+// projectStateKey leaves out the kind: names are unique across kinds, and keys
+// of installations recorded before rules existed must stay the same.
+func projectStateKey(projectRoot, scope, harness, name string) string {
+	sum := sha256.Sum256([]byte(projectRoot + "\x00" + scope + "\x00" + harness + "\x00" + name))
 	return hex.EncodeToString(sum[:])
 }
 

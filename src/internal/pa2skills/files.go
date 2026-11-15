@@ -149,3 +149,25 @@ func copyTreeContents(source, target string) error {
 		return inputCloseErr
 	})
 }
+
+// writeFileAtomic replaces path so readers never see a partially written file.
+func writeFileAtomic(path string, contents []byte, mode os.FileMode) error {
+	temporary, err := os.CreateTemp(filepath.Dir(path), ".pa2-skills-")
+	if err != nil {
+		return err
+	}
+	temporaryName := temporary.Name()
+	defer os.Remove(temporaryName)
+	if _, err := temporary.Write(contents); err != nil {
+		temporary.Close()
+		return err
+	}
+	if err := temporary.Chmod(mode); err != nil {
+		temporary.Close()
+		return err
+	}
+	if err := temporary.Close(); err != nil {
+		return err
+	}
+	return os.Rename(temporaryName, path)
+}

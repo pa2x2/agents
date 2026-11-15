@@ -63,7 +63,7 @@ func (m Manager) Discover(root string) ([]Discovery, error) {
 		if !skillInfo.Mode().IsRegular() {
 			finding.Status = "INVALID"
 			finding.Detail = "SKILL.md is not a regular file"
-		} else if err := ValidateSkillName(name); err != nil {
+		} else if err := ValidateName(name); err != nil {
 			finding.Status = "INVALID"
 			finding.Detail = err.Error()
 		} else if declared, err := declaredSkillName(skillFile); err != nil {
@@ -129,7 +129,7 @@ func (m Manager) AddSkill(source, requestedName string) (string, error) {
 	if name == "" {
 		name = filepath.Base(resolvedSource)
 	}
-	if err := ValidateSkillName(name); err != nil {
+	if err := ValidateName(name); err != nil {
 		return "", err
 	}
 	declared, err := declaredSkillName(skillFile)
@@ -143,6 +143,11 @@ func (m Manager) AddSkill(source, requestedName string) (string, error) {
 		return "", err
 	}
 
+	if item, err := m.findItem(name); err == nil {
+		return "", fmt.Errorf("%s %q is already tracked at %s", item.Kind, name, item.Source)
+	} else if !errors.Is(err, errUnknownItem) {
+		return "", err
+	}
 	target := filepath.Join(m.Paths.SourceRoot, "skills", name)
 	if _, err := os.Lstat(target); err == nil {
 		return "", fmt.Errorf("skill %q is already tracked at %s", name, target)
@@ -181,12 +186,12 @@ func shouldSkipDiscoveryDirectory(name string) bool {
 	return strings.HasPrefix(name, ".") && !traversedHiddenDirectories[name]
 }
 
-func ValidateSkillName(name string) error {
+func ValidateName(name string) error {
 	if name == "" || name == "." || name == ".." || filepath.Base(name) != name || strings.ContainsAny(name, `/\\`) {
-		return fmt.Errorf("invalid skill name %q", name)
+		return fmt.Errorf("invalid name %q", name)
 	}
-	if name == SkillAll {
-		return fmt.Errorf("skill name %q is reserved", name)
+	if name == NameAll {
+		return fmt.Errorf("name %q is reserved", name)
 	}
 	return nil
 }

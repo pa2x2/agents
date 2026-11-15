@@ -18,8 +18,8 @@ var Harnesses = []string{"claude", "codex", "opencode"}
 // HarnessAll selects every supported harness.
 const HarnessAll = "all"
 
-// SkillAll selects every skill in the managed source checkout.
-const SkillAll = "all"
+// NameAll selects every skill and rule in the managed source checkout.
+const NameAll = "all"
 
 type Scope string
 
@@ -37,8 +37,6 @@ const (
 	ConflictAllOverwrite ConflictPolicy = "all-overwrite"
 )
 
-var errUnknownSkill = errors.New("unknown skill")
-
 type Manager struct {
 	Paths  Paths
 	Stdin  io.Reader
@@ -46,119 +44,114 @@ type Manager struct {
 	Stderr io.Writer
 }
 
-func (m Manager) SkillNames() ([]string, error) {
-	entries, err := os.ReadDir(filepath.Join(m.Paths.SourceRoot, "skills"))
-	if err != nil {
-		return nil, fmt.Errorf("read skills source: %w", err)
-	}
-	var names []string
-	for _, entry := range entries {
-		if !entry.IsDir() {
-			continue
-		}
-		if _, err := os.Stat(filepath.Join(m.Paths.SourceRoot, "skills", entry.Name(), "SKILL.md")); err == nil {
-			names = append(names, entry.Name())
-		}
-	}
-	sort.Strings(names)
-	return names, nil
-}
-
-func (m Manager) Install(skills []string, scope Scope, harnesses []string, policy ConflictPolicy) error {
-	if err := ValidateInstallArguments(skills, scope, harnesses, policy); err != nil {
+func (m Manager) Install(names []string, scope Scope, harnesses []string, policy ConflictPolicy) error {
+	if err := ValidateInstallArguments(names, scope, harnesses, policy); err != nil {
 		return err
 	}
 	projectRoot, err := m.projectRoot(scope)
 	if err != nil {
 		return err
 	}
-	skills, err = m.ExpandSkills(skills)
+	items, err := m.selectItems(names)
 	if err != nil {
 		return err
 	}
+	ref := m.sourceRef()
 	activePolicy := policy
-	for _, skill := range skills {
-		if err := m.installSkill(skill, scope, harnesses, projectRoot, &activePolicy); err != nil {
+	for _, item := range items {
+		if err := m.installItem(item, ref, scope, harnesses, projectRoot, &activePolicy); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-// ExpandSkills replaces SkillAll with every available skill and removes duplicates.
-func (m Manager) ExpandSkills(values []string) ([]string, error) {
+// selectItems resolves names to items, expanding NameAll to every item and removing duplicates.
+func (m Manager) selectItems(names []string) ([]Item, error) {
+	available, err := m.Items()
+	if err != nil {
+		return nil, err
+	}
+	byName := map[string]Item{}
+	for _, item := range available {
+		byName[item.Name] = item
+	}
 	seen := map[string]bool{}
-	result := make([]string, 0, len(values))
-	for _, value := range values {
-		expanded := []string{value}
-		if value == SkillAll {
-			names, err := m.SkillNames()
-			if err != nil {
-				return nil, err
-			}
-			expanded = names
+	var result []Item
+	add := func(item Item) {
+		if !seen[item.Name] {
+			seen[item.Name] = true
+			result = append(result, item)
 		}
-		for _, skill := range expanded {
-			if !seen[skill] {
-				seen[skill] = true
-				result = append(result, skill)
+	}
+	for _, name := range names {
+		if name == NameAll {
+			for _, item := range available {
+				add(item)
 			}
+			continue
 		}
+		item, found := byName[name]
+		if !found {
+			return nil, fmt.Errorf("%w %q", errUnknownItem, name)
+		}
+		add(item)
 	}
 	return result, nil
 }
 
-func (m Manager) installSkill(skill string, scope Scope, harnesses []string, projectRoot string, activePolicy *ConflictPolicy) error {
-	source, ref, err := m.skillSource(skill)
-	if err != nil {
-		return err
-	}
+func (m Manager) installItem(item Item, ref string, scope Scope, harnesses []string, projectRoot string, activePolicy *ConflictPolicy) error {
+	handler := handlerFor(item.Kind)
 	for _, harness := range harnesses {
-		target, err := m.targetPath(skill, scope, harness, projectRoot)
+		target, err := handler.targetPath(m.Paths, item.Name, scope, harness, projectRoot)
 		if err != nil {
 			return err
 		}
-		key := projectStateKey(projectRoot, string(scope), harness, skill)
+		key := projectStateKey(projectRoot, string(scope), harness, item.Name)
 		current, known, err := m.Paths.readInstallation(key)
 		if err != nil {
 			return err
 		}
-		currentHash, err := treeHash(target)
+		if known && current.Kind != item.Kind {
+			return fmt.Errorf("%s is tracked as a %s for %s at %s but is now a %s; run pa2-skills remove %s first", item.Name, current.Kind, harness, current.Target, item.Kind, item.Name)
+		}
+		currentHash, err := handler.targetHash(target, item.Name)
 		if err != nil {
 			return err
 		}
 		if known && currentHash != "" {
-			upToDate, err := m.updateTarget(current, key, source, ref, activePolicy)
+			upToDate, err := m.updateTarget(current, key, item.Source, ref, activePolicy)
 			if err != nil {
 				return err
 			}
 			if upToDate {
-				fmt.Fprintf(m.Stdout, "Already current: %s for %s at %s\n", skill, harness, target)
+				fmt.Fprintf(m.Stdout, "Already current: %s for %s at %s\n", item.Name, harness, target)
 			}
 			continue
 		}
-		if !known && currentHash != "" {
-			installation := Installation{
-				Version:     1,
-				Scope:       string(scope),
-				Harness:     harness,
-				Skill:       skill,
-				ProjectRoot: projectRoot,
-				Target:      target,
-				SourceRef:   ref,
-			}
-			sourceHash, err := treeHash(source)
+		installation := Installation{
+			Version:     1,
+			Scope:       string(scope),
+			Harness:     harness,
+			Kind:        item.Kind,
+			Name:        item.Name,
+			ProjectRoot: projectRoot,
+			Target:      target,
+			SourceRef:   ref,
+		}
+		if currentHash != "" {
+			sourceHash, err := handler.sourceHash(item.Source)
 			if err != nil {
 				return err
 			}
 			if currentHash == sourceHash {
-				if err := m.materialize(installation, key, source); err != nil {
+				if err := m.materialize(installation, key, item.Source); err != nil {
 					return err
 				}
-				fmt.Fprintf(m.Stdout, "Adopted matching %s for %s at %s\n", skill, harness, target)
+				fmt.Fprintf(m.Stdout, "Adopted matching %s for %s at %s\n", item.Name, harness, target)
 				continue
 			}
-			decision, err := m.resolveUnmanagedConflict(target, source, *activePolicy)
+			decision, err := m.resolveUnmanagedConflict(installation, item.Source, *activePolicy)
 			if err != nil {
 				return err
 			}
@@ -167,13 +160,13 @@ func (m Manager) installSkill(skill string, scope Scope, harnesses []string, pro
 				decision = ConflictOverwrite
 			}
 			if decision == ConflictOverwrite {
-				if err := m.materialize(installation, key, source); err != nil {
+				if err := m.materialize(installation, key, item.Source); err != nil {
 					return err
 				}
-				fmt.Fprintf(m.Stdout, "Replaced unmanaged %s for %s at %s\n", skill, harness, target)
+				fmt.Fprintf(m.Stdout, "Replaced unmanaged %s for %s at %s\n", item.Name, harness, target)
 				continue
 			}
-			baseline, err := m.Paths.saveBaseline(source)
+			baseline, err := m.Paths.saveBaseline(handler, item.Source)
 			if err != nil {
 				return err
 			}
@@ -182,33 +175,25 @@ func (m Manager) installSkill(skill string, scope Scope, harnesses []string, pro
 			if err := m.Paths.writeInstallation(key, installation); err != nil {
 				return err
 			}
-			fmt.Fprintf(m.Stdout, "Adopted locally customized %s for %s at %s\n", skill, harness, target)
+			fmt.Fprintf(m.Stdout, "Adopted locally customized %s for %s at %s\n", item.Name, harness, target)
 			continue
 		}
-		if err := m.materialize(Installation{
-			Version:     1,
-			Scope:       string(scope),
-			Harness:     harness,
-			Skill:       skill,
-			ProjectRoot: projectRoot,
-			Target:      target,
-			SourceRef:   ref,
-		}, key, source); err != nil {
+		if err := m.materialize(installation, key, item.Source); err != nil {
 			return err
 		}
-		fmt.Fprintf(m.Stdout, "Installed %s for %s at %s\n", skill, harness, target)
+		fmt.Fprintf(m.Stdout, "Installed %s %s for %s at %s\n", item.Kind, item.Name, harness, target)
 	}
 	return nil
 }
 
-func (m Manager) Sync(skills []string, scope Scope, harnesses []string, policy ConflictPolicy) error {
-	if err := ValidateInstallArguments(skills, scope, harnesses, policy); err != nil {
+func (m Manager) Sync(names []string, scope Scope, harnesses []string, policy ConflictPolicy) error {
+	if err := ValidateInstallArguments(names, scope, harnesses, policy); err != nil {
 		return err
 	}
 	if err := m.refreshSource(); err != nil {
 		return err
 	}
-	return m.Install(skills, scope, harnesses, policy)
+	return m.Install(names, scope, harnesses, policy)
 }
 
 func (m Manager) UpdateAll(policy ConflictPolicy) error {
@@ -219,26 +204,31 @@ func (m Manager) UpdateAll(policy ConflictPolicy) error {
 	if err != nil {
 		return err
 	}
+	ref := m.sourceRef()
 	activePolicy := policy
 	for _, stored := range installations {
 		installation := stored.Installation
-		if _, err := os.Lstat(installation.Target); os.IsNotExist(err) {
-			fmt.Fprintf(m.Stdout, "Missing %s for %s at %s; run pa2-skills install to restore it or pa2-skills remove to stop tracking it\n", installation.Skill, installation.Harness, installation.Target)
+		localHash, err := handlerFor(installation.Kind).targetHash(installation.Target, installation.Name)
+		if err != nil {
+			return err
+		}
+		if localHash == "" {
+			fmt.Fprintf(m.Stdout, "Missing %s for %s at %s; run pa2-skills install to restore it or pa2-skills remove to stop tracking it\n", installation.Name, installation.Harness, installation.Target)
 			continue
 		}
-		source, ref, err := m.skillSource(installation.Skill)
-		if errors.Is(err, errUnknownSkill) {
-			fmt.Fprintf(m.Stdout, "Skipped %s for %s at %s: no longer in the source checkout; run pa2-skills remove to stop tracking it\n", installation.Skill, installation.Harness, installation.Target)
+		item, err := m.findItem(installation.Name)
+		if errors.Is(err, errUnknownItem) || err == nil && item.Kind != installation.Kind {
+			fmt.Fprintf(m.Stdout, "Skipped %s for %s at %s: no longer in the source checkout; run pa2-skills remove to stop tracking it\n", installation.Name, installation.Harness, installation.Target)
 			continue
 		}
 		if err != nil {
-			return fmt.Errorf("sync %s at %s: %w", installation.Skill, installation.Target, err)
+			return fmt.Errorf("sync %s at %s: %w", installation.Name, installation.Target, err)
 		}
-		if _, err := m.updateTarget(installation, stored.Key, source, ref, &activePolicy); err != nil {
+		if _, err := m.updateTarget(installation, stored.Key, item.Source, ref, &activePolicy); err != nil {
 			return err
 		}
 	}
-	fmt.Fprintf(m.Stdout, "Skills: synchronized %d managed installation(s)\n", len(installations))
+	fmt.Fprintf(m.Stdout, "Skills and rules: synchronized %d managed installation(s)\n", len(installations))
 	return nil
 }
 
@@ -264,11 +254,12 @@ func (m Manager) CheckSource() (string, error) {
 
 // updateTarget refreshes a managed installation and reports whether it already matched the source.
 func (m Manager) updateTarget(installation Installation, key, source, ref string, policy *ConflictPolicy) (bool, error) {
-	localHash, err := treeHash(installation.Target)
+	handler := handlerFor(installation.Kind)
+	localHash, err := handler.targetHash(installation.Target, installation.Name)
 	if err != nil {
 		return false, err
 	}
-	sourceHash, err := treeHash(source)
+	sourceHash, err := handler.sourceHash(source)
 	if err != nil {
 		return false, err
 	}
@@ -279,7 +270,7 @@ func (m Manager) updateTarget(installation Installation, key, source, ref string
 		return false, m.materializeUpdate(installation, key, source, ref)
 	}
 	if sourceHash == installation.Baseline {
-		fmt.Fprintf(m.Stdout, "Kept locally customized %s for %s at %s\n", installation.Skill, installation.Harness, installation.Target)
+		fmt.Fprintf(m.Stdout, "Kept locally customized %s for %s at %s\n", installation.Name, installation.Harness, installation.Target)
 		return false, nil
 	}
 	decision, err := m.resolveConflict(installation, source, *policy)
@@ -291,7 +282,7 @@ func (m Manager) updateTarget(installation Installation, key, source, ref string
 		decision = ConflictOverwrite
 	}
 	if decision == ConflictSkip {
-		fmt.Fprintf(m.Stdout, "Skipped remote changes for %s for %s at %s\n", installation.Skill, installation.Harness, installation.Target)
+		fmt.Fprintf(m.Stdout, "Skipped remote changes for %s for %s at %s\n", installation.Name, installation.Harness, installation.Target)
 		return false, nil
 	}
 	return false, m.materializeUpdate(installation, key, source, ref)
@@ -301,15 +292,16 @@ func (m Manager) materializeUpdate(installation Installation, key, source, ref s
 	if err := m.materialize(installationWithRef(installation, ref), key, source); err != nil {
 		return err
 	}
-	fmt.Fprintf(m.Stdout, "Updated %s for %s at %s\n", installation.Skill, installation.Harness, installation.Target)
+	fmt.Fprintf(m.Stdout, "Updated %s for %s at %s\n", installation.Name, installation.Harness, installation.Target)
 	return nil
 }
 
 func (m Manager) materialize(installation Installation, key, source string) error {
-	if err := copyTree(source, installation.Target); err != nil {
+	handler := handlerFor(installation.Kind)
+	if err := handler.write(source, installation.Target, installation.Name); err != nil {
 		return err
 	}
-	baseline, err := m.Paths.saveBaseline(source)
+	baseline, err := m.Paths.saveBaseline(handler, source)
 	if err != nil {
 		return err
 	}
@@ -328,22 +320,22 @@ func (m Manager) resolveConflict(installation Installation, source string, polic
 	if !isTerminal(m.Stdin) {
 		return "", fmt.Errorf("%s has local and remote changes; re-run with --conflict=overwrite or --conflict=skip", installation.Target)
 	}
-	return m.promptConflict(installation.Target+" has changed since pa2-skills last wrote it.", installation.Target, source, "update cancelled")
+	return m.promptConflict(installation.Name+" at "+installation.Target+" has changed since pa2-skills last wrote it.", installation, source, "update cancelled")
 }
 
-func (m Manager) resolveUnmanagedConflict(target, source string, policy ConflictPolicy) (ConflictPolicy, error) {
+func (m Manager) resolveUnmanagedConflict(installation Installation, source string, policy ConflictPolicy) (ConflictPolicy, error) {
 	if policy == ConflictOverwrite || policy == ConflictSkip {
 		return policy, nil
 	}
 	if !isTerminal(m.Stdin) {
-		return "", fmt.Errorf("%s exists but has no private pa2-skills state; re-run with --conflict=overwrite or --conflict=skip", target)
+		return "", fmt.Errorf("%s at %s exists but has no private pa2-skills state; re-run with --conflict=overwrite or --conflict=skip", installation.Name, installation.Target)
 	}
-	return m.promptConflict(target+" exists but was not installed by this machine.", target, source, "installation cancelled")
+	return m.promptConflict(installation.Name+" at "+installation.Target+" exists but was not installed by this machine.", installation, source, "installation cancelled")
 }
 
 // promptConflict asks how to handle a conflicting target. Each choice can be
 // typed in full or by the shortcut letter shown in brackets.
-func (m Manager) promptConflict(message, target, source, cancelled string) (ConflictPolicy, error) {
+func (m Manager) promptConflict(message string, installation Installation, source, cancelled string) (ConflictPolicy, error) {
 	reader := bufio.NewReader(m.Stdin)
 	for {
 		fmt.Fprintf(m.Stdout, "%s\n> [d]iff / [o]verwrite / [a]ll-overwrite / [s]kip / [q]uit\n", message)
@@ -353,7 +345,7 @@ func (m Manager) promptConflict(message, target, source, cancelled string) (Conf
 		}
 		switch strings.ToLower(strings.TrimSpace(choice)) {
 		case "d", "diff":
-			if err := showDiff(m.Stdout, target, source); err != nil {
+			if err := handlerFor(installation.Kind).diff(m.Stdout, installation.Target, source, installation.Name); err != nil {
 				return "", err
 			}
 		case "o", "overwrite":
@@ -381,43 +373,13 @@ func (m Manager) projectRoot(scope Scope) (string, error) {
 	return filepath.EvalSymlinks(strings.TrimSpace(string(output)))
 }
 
-func (m Manager) skillSource(skill string) (string, string, error) {
-	source := filepath.Join(m.Paths.SourceRoot, "skills", skill)
-	if _, err := os.Stat(filepath.Join(source, "SKILL.md")); err != nil {
-		if os.IsNotExist(err) {
-			return "", "", fmt.Errorf("%w %q", errUnknownSkill, skill)
-		}
-		return "", "", err
+// sourceRef is the source checkout commit recorded with each installation.
+func (m Manager) sourceRef() string {
+	output, err := exec.Command("git", "-C", m.Paths.SourceRoot, "rev-parse", "HEAD").Output()
+	if err != nil {
+		return "local"
 	}
-	ref := "local"
-	if output, err := exec.Command("git", "-C", m.Paths.SourceRoot, "rev-parse", "HEAD").Output(); err == nil {
-		ref = strings.TrimSpace(string(output))
-	}
-	return source, ref, nil
-}
-
-func (m Manager) targetPath(skill string, scope Scope, harness, projectRoot string) (string, error) {
-	if scope == ScopeUser {
-		switch harness {
-		case "codex":
-			return filepath.Join(m.Paths.Home, ".agents", "skills", skill), nil
-		case "claude":
-			return filepath.Join(m.Paths.Home, ".claude", "skills", skill), nil
-		case "opencode":
-			return filepath.Join(m.Paths.ConfigHome, "opencode", "skills", skill), nil
-		}
-	}
-	if scope == ScopeProject {
-		switch harness {
-		case "codex":
-			return filepath.Join(projectRoot, ".agents", "skills", skill), nil
-		case "claude":
-			return filepath.Join(projectRoot, ".claude", "skills", skill), nil
-		case "opencode":
-			return filepath.Join(projectRoot, ".opencode", "skills", skill), nil
-		}
-	}
-	return "", fmt.Errorf("unsupported harness %q", harness)
+	return strings.TrimSpace(string(output))
 }
 
 func (m Manager) refreshSource() error {
@@ -470,16 +432,16 @@ func ExpandHarnesses(values []string) []string {
 	return result
 }
 
-func ValidateInstallArguments(skills []string, scope Scope, harnesses []string, policy ConflictPolicy) error {
+func ValidateInstallArguments(names []string, scope Scope, harnesses []string, policy ConflictPolicy) error {
 	var validationErrors []error
-	if len(skills) == 0 {
-		validationErrors = append(validationErrors, errors.New("at least one skill name is required"))
+	if len(names) == 0 {
+		validationErrors = append(validationErrors, errors.New("at least one skill or rule name is required"))
 	}
-	for _, skill := range skills {
-		if skill == SkillAll {
+	for _, name := range names {
+		if name == NameAll {
 			continue
 		}
-		if err := ValidateSkillName(skill); err != nil {
+		if err := ValidateName(name); err != nil {
 			validationErrors = append(validationErrors, err)
 		}
 	}

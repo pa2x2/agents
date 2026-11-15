@@ -19,20 +19,20 @@ const (
 	StatusOrphaned = "orphaned"
 )
 
-// Status reports every managed installation, optionally limited to the named skills.
-func (m Manager) Status(skills []string) ([]InstallationStatus, error) {
+// Status reports every managed installation, optionally limited to the named skills and rules.
+func (m Manager) Status(names []string) ([]InstallationStatus, error) {
 	installations, err := m.Paths.installations()
 	if err != nil {
 		return nil, err
 	}
 	selected := map[string]bool{}
-	for _, skill := range skills {
-		selected[skill] = true
+	for _, name := range names {
+		selected[name] = true
 	}
 	var result []InstallationStatus
 	for _, stored := range installations {
 		installation := stored.Installation
-		if len(selected) > 0 && !selected[installation.Skill] {
+		if len(selected) > 0 && !selected[installation.Name] {
 			continue
 		}
 		status, err := m.installationStatus(installation)
@@ -45,21 +45,22 @@ func (m Manager) Status(skills []string) ([]InstallationStatus, error) {
 }
 
 func (m Manager) installationStatus(installation Installation) (string, error) {
-	localHash, err := treeHash(installation.Target)
+	handler := handlerFor(installation.Kind)
+	localHash, err := handler.targetHash(installation.Target, installation.Name)
 	if err != nil {
 		return "", err
 	}
 	if localHash == "" {
 		return StatusMissing, nil
 	}
-	source, _, err := m.skillSource(installation.Skill)
-	if errors.Is(err, errUnknownSkill) {
+	item, err := m.findItem(installation.Name)
+	if errors.Is(err, errUnknownItem) || err == nil && item.Kind != installation.Kind {
 		return StatusOrphaned, nil
 	}
 	if err != nil {
 		return "", err
 	}
-	sourceHash, err := treeHash(source)
+	sourceHash, err := handler.sourceHash(item.Source)
 	if err != nil {
 		return "", err
 	}

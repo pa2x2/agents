@@ -3,6 +3,7 @@ package pa2skills
 import (
 	"bytes"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -151,7 +152,7 @@ func TestInstallAllInstallsEverySkill(t *testing.T) {
 	writeSkill(t, paths.SourceRoot, "first", "one")
 	writeSkill(t, paths.SourceRoot, "second", "two")
 
-	if err := manager.Install([]string{"second", SkillAll}, ScopeUser, []string{"claude"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"second", NameAll}, ScopeUser, []string{"claude"}, ConflictAsk); err != nil {
 		t.Fatal(err)
 	}
 	for name, want := range map[string]string{"first": "one", "second": "two"} {
@@ -202,13 +203,13 @@ func TestRemoveKeepsLocalChangesUnlessForced(t *testing.T) {
 	}
 	target := filepath.Join(paths.Home, ".agents", "skills", "example", "SKILL.md")
 	writeFile(t, target, "local")
-	if err := manager.Remove([]string{SkillAll}, ScopeUser, Harnesses, false); err != nil {
+	if err := manager.Remove([]string{NameAll}, ScopeUser, Harnesses, false); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, target); got != "local" {
 		t.Fatalf("target = %q, want local", got)
 	}
-	if err := manager.Remove([]string{SkillAll}, ScopeUser, Harnesses, true); err != nil {
+	if err := manager.Remove([]string{NameAll}, ScopeUser, Harnesses, true); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(target); !os.IsNotExist(err) {
@@ -285,15 +286,90 @@ func TestPromptConflictAcceptsShortcuts(t *testing.T) {
 	}
 	for input, want := range cases {
 		manager := Manager{Stdin: strings.NewReader(input), Stdout: &bytes.Buffer{}}
-		got, err := manager.promptConflict("conflict", "target", "source", "cancelled")
+		got, err := manager.promptConflict("conflict", Installation{Kind: KindSkill}, "source", "cancelled")
 		if err != nil || got != want {
 			t.Errorf("input %q: got %q, %v; want %q", input, got, err, want)
 		}
 	}
 	for _, input := range []string{"q\n", "quit\n", "\n"} {
 		manager := Manager{Stdin: strings.NewReader(input), Stdout: &bytes.Buffer{}}
-		if _, err := manager.promptConflict("conflict", "target", "source", "cancelled"); err == nil || err.Error() != "cancelled" {
+		if _, err := manager.promptConflict("conflict", Installation{Kind: KindSkill}, "source", "cancelled"); err == nil || err.Error() != "cancelled" {
 			t.Errorf("input %q: err = %v, want cancelled", input, err)
 		}
+	}
+}
+
+func TestRuleBlockLeavesUserTextUntouched(t *testing.T) {
+	manager, paths := testManager(t)
+	writeFile(t, filepath.Join(paths.SourceRoot, "rules", "commits.md"), "# Commits\n\nfirst\n")
+	target := filepath.Join(paths.Home, ".claude", "CLAUDE.md")
+	original := "# Mine\n\nkeep this\n"
+	writeFile(t, target, original)
+
+	if err := manager.Install([]string{"commits"}, ScopeUser, []string{"claude"}, ConflictAsk); err != nil {
+		t.Fatal(err)
+	}
+	want := original + "\n<!-- pa2-skills:begin commits -->\n# Commits\n\nfirst\n<!-- pa2-skills:end commits -->\n"
+	if got := readFile(t, target); got != want {
+		t.Fatalf("installed = %q, want %q", got, want)
+	}
+
+	writeFile(t, target, readFile(t, target)+"\nadded after\n")
+	writeFile(t, filepath.Join(paths.SourceRoot, "rules", "commits.md"), "second\n")
+	if err := manager.Install([]string{"commits"}, ScopeUser, []string{"claude"}, ConflictAsk); err != nil {
+		t.Fatal(err)
+	}
+	want = original + "\n<!-- pa2-skills:begin commits -->\nsecond\n<!-- pa2-skills:end commits -->\n\nadded after\n"
+	if got := readFile(t, target); got != want {
+		t.Fatalf("updated = %q, want %q", got, want)
+	}
+	if statuses, err := manager.Status(nil); err != nil || len(statuses) != 1 || statuses[0].Status != StatusCurrent {
+		t.Fatalf("statuses = %v, %v; want one current", statuses, err)
+	}
+
+	if err := manager.Remove([]string{"commits"}, ScopeUser, []string{"claude"}, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, target); got != original+"\nadded after\n" {
+		t.Fatalf("after removal = %q", got)
+	}
+}
+
+func TestProjectRuleSharedBySeveralHarnesses(t *testing.T) {
+	manager, paths := testManager(t)
+	writeFile(t, filepath.Join(paths.SourceRoot, "rules", "commits.md"), "rule")
+	project := t.TempDir()
+	if output, err := exec.Command("git", "init", "-q", project).CombinedOutput(); err != nil {
+		t.Fatalf("git init: %v: %s", err, output)
+	}
+	t.Chdir(project)
+	agents := filepath.Join(project, "AGENTS.md")
+	writeFile(t, agents, "# Project\n")
+	if err := os.Symlink("AGENTS.md", filepath.Join(project, "CLAUDE.md")); err != nil {
+		t.Fatal(err)
+	}
+
+	if err := manager.Install([]string{"commits"}, ScopeProject, Harnesses, ConflictAsk); err != nil {
+		t.Fatal(err)
+	}
+	want := "# Project\n\n<!-- pa2-skills:begin commits -->\nrule\n<!-- pa2-skills:end commits -->\n"
+	if got := readFile(t, agents); got != want {
+		t.Fatalf("AGENTS.md = %q, want one block: %q", got, want)
+	}
+	if info, err := os.Lstat(filepath.Join(project, "CLAUDE.md")); err != nil || info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("CLAUDE.md is no longer a symlink: %v", err)
+	}
+
+	if err := manager.Remove([]string{"commits"}, ScopeProject, []string{"claude", "codex"}, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, agents); got != want {
+		t.Fatalf("AGENTS.md = %q, want the block kept for opencode", got)
+	}
+	if err := manager.Remove([]string{"commits"}, ScopeProject, []string{"opencode"}, false); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, agents); got != "# Project\n" {
+		t.Fatalf("AGENTS.md = %q, want the block removed", got)
 	}
 }

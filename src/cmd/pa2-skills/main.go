@@ -62,7 +62,7 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		if err := requireNoArguments("list", arguments[1:]); err != nil {
 			return err
 		}
-		return listSkills(manager, stdout)
+		return listItems(manager, stdout)
 	case "status":
 		return showStatus(arguments[1:], manager, stdout)
 	case "discover":
@@ -223,7 +223,7 @@ func addSkill(arguments []string, manager pa2skills.Manager, stdout io.Writer) e
 		validationErrors = append(validationErrors, errors.New("skill path is required"))
 	}
 	if *name != "" {
-		if err := pa2skills.ValidateSkillName(*name); err != nil {
+		if err := pa2skills.ValidateName(*name); err != nil {
 			validationErrors = append(validationErrors, err)
 		}
 	}
@@ -340,28 +340,30 @@ func updateInstallation(arguments []string, manager pa2skills.Manager, stdout, s
 		fmt.Fprintf(stdout, "Source: %s\n", result)
 		return nil
 	}
-	fmt.Fprintln(stdout, "Source: synchronizing checkout and installed skills...")
+	fmt.Fprintln(stdout, "Source: synchronizing checkout and installed skills and rules...")
 	return manager.UpdateAll(policy)
 }
 
-func listSkills(manager pa2skills.Manager, stdout io.Writer) error {
-	names, err := manager.SkillNames()
+func listItems(manager pa2skills.Manager, stdout io.Writer) error {
+	items, err := manager.Items()
 	if err != nil {
 		return err
 	}
-	for _, name := range names {
-		fmt.Fprintln(stdout, name)
+	writer := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(writer, "KIND\tNAME")
+	for _, item := range items {
+		fmt.Fprintf(writer, "%s\t%s\n", item.Kind, item.Name)
 	}
-	return nil
+	return writer.Flush()
 }
 
 func showStatus(arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
 	flags := newFlagSet("status")
-	skills, err := parseArguments(flags, arguments)
+	names, err := parseArguments(flags, arguments)
 	if err != nil {
 		return err
 	}
-	statuses, err := manager.Status(skills)
+	statuses, err := manager.Status(names)
 	if err != nil {
 		return err
 	}
@@ -370,10 +372,10 @@ func showStatus(arguments []string, manager pa2skills.Manager, stdout io.Writer)
 		return nil
 	}
 	writer := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(writer, "STATUS\tSKILL\tHARNESS\tSCOPE\tTARGET")
+	fmt.Fprintln(writer, "STATUS\tKIND\tNAME\tHARNESS\tSCOPE\tTARGET")
 	for _, status := range statuses {
 		installation := status.Installation
-		fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\n", status.Status, installation.Skill, installation.Harness, installation.Scope, installation.Target)
+		fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\t%s\n", status.Status, installation.Kind, installation.Name, installation.Harness, installation.Scope, installation.Target)
 	}
 	return writer.Flush()
 }
@@ -425,12 +427,12 @@ func completion(arguments []string, manager pa2skills.Manager, stdout io.Writer)
 		fmt.Fprint(stdout, zshCompletion)
 		return nil
 	case "values":
-		names, err := manager.SkillNames()
+		items, err := manager.Items()
 		if err != nil {
 			return err
 		}
-		for _, name := range names {
-			fmt.Fprintln(stdout, name)
+		for _, item := range items {
+			fmt.Fprintln(stdout, item.Name)
 		}
 		return nil
 	}
@@ -496,20 +498,20 @@ type commandHelp struct {
 var commandHelps = []commandHelp{
 	{
 		name:    "install",
-		usage:   "install <skill>...|all [--scope user|project] --harness <harnesses>|all [--conflict ask|overwrite|skip]",
-		summary: "Install skills from the managed source checkout, or refresh existing installations. all selects every available skill.",
+		usage:   "install <name>...|all [--scope user|project] --harness <harnesses>|all [--conflict ask|overwrite|skip]",
+		summary: "Install skills and rules from the managed source checkout, or refresh existing installations. all selects every available skill and rule.\nA rule is written between pa2-skills markers in the harness's CLAUDE.md or AGENTS.md; text outside the markers is never changed.",
 		details: installFlagsHelp,
 	},
 	{
 		name:    "sync",
-		usage:   "sync <skill>...|all [--scope user|project] --harness <harnesses>|all [--conflict ask|overwrite|skip]",
-		summary: "Fetch the source repository, then install or refresh skills. all selects every available skill.",
+		usage:   "sync <name>...|all [--scope user|project] --harness <harnesses>|all [--conflict ask|overwrite|skip]",
+		summary: "Fetch the source repository, then install or refresh skills and rules. all selects every available skill and rule.",
 		details: installFlagsHelp,
 	},
 	{
 		name:    "remove",
-		usage:   "remove <skill>...|all [--scope user|project] --harness <harnesses>|all [--force]",
-		summary: "Delete managed installations and stop tracking them. all selects every managed installation in the scope.\nDirectories pa2-skills did not install are never touched.",
+		usage:   "remove <name>...|all [--scope user|project] --harness <harnesses>|all [--force]",
+		summary: "Delete managed installations and stop tracking them. all selects every managed installation in the scope.\nFiles and rule text pa2-skills did not install are never touched.",
 		details: `Flags:
   --scope user|project             remove from the user or from the current Git project
                                    (default: $PA2_SKILLS_SCOPE, else user)
@@ -525,22 +527,22 @@ var commandHelps = []commandHelp{
 		details: `Flags:
   --check                          report available updates without changing files
   --binary-only                    only update the pa2-skills binary
-  --skills-only                    only update the source checkout and managed skills
-  --conflict ask|overwrite|skip    how to resolve skills with local and remote changes (default: ask)
+  --skills-only                    only update the source checkout and managed skills and rules
+  --conflict ask|overwrite|skip    how to resolve skills and rules with local and remote changes (default: ask)
 `,
 	},
-	{name: "list", usage: "list", summary: "List skills available from the managed source checkout."},
+	{name: "list", usage: "list", summary: "List skills and rules available from the managed source checkout."},
 	{
 		name:    "status",
-		usage:   "status [skill...]",
+		usage:   "status [name...]",
 		summary: "Show every managed installation and how it compares with the local source checkout.",
 		details: `Statuses:
   current     matches the source checkout
   outdated    the source checkout changed; run pa2-skills install or update to refresh it
   modified    changed locally since pa2-skills last wrote it
   diverged    changed both locally and in the source checkout
-  missing     the installed directory was deleted
-  orphaned    the skill is no longer in the source checkout
+  missing     the installed skill directory or rule block was deleted
+  orphaned    the skill or rule is no longer in the source checkout
 
 Run 'pa2-skills update --check' to see whether the remote source has changes.
 `,
@@ -601,14 +603,14 @@ const zshCompletion = `#compdef pa2-skills
 
 _pa2_skills() {
   local command
-  local -a commands skills harnesses scopes conflicts
+  local -a commands names harnesses scopes conflicts
   commands=(
-    'install:install or refresh a skill'
-    'sync:fetch the source repository and refresh a skill'
-    'remove:delete managed skill installations'
-    'update:update the binary, source, and managed skills'
+    'install:install or refresh a skill or rule'
+    'sync:fetch the source repository and refresh a skill or rule'
+    'remove:delete managed skill and rule installations'
+    'update:update the binary, source, and managed skills and rules'
     'version:print the installed command version'
-    'list:list available skills'
+    'list:list available skills and rules'
     'status:show managed installations'
     'discover:find skills below a directory'
     'add:copy a skill into the managed source checkout'
@@ -632,12 +634,12 @@ _pa2_skills() {
         '--scope=[installation scope]:scope:->scope' \
         '--harness=[comma-separated harnesses, or all]:harness:->harness' \
         '--conflict=[conflict policy]:policy:->conflict' \
-        '*:skill:->skill'
+        '*:name:->name'
       case $state in
         scope) _values 'scope' $scopes ;;
         harness) _values -s , 'harness' $harnesses ;;
         conflict) _values 'conflict policy' $conflicts ;;
-        skill) skills=(all "${(@f)$($words[1] completion values 2>/dev/null)}"); _describe -t skills skill skills ;;
+        name) names=(all "${(@f)$($words[1] completion values 2>/dev/null)}"); _describe -t names name names ;;
       esac
       ;;
     remove)
@@ -645,25 +647,25 @@ _pa2_skills() {
         '--scope=[installation scope]:scope:->scope' \
         '--harness=[comma-separated harnesses, or all]:harness:->harness' \
         '--force[also remove installations with local changes]' \
-        '*:skill:->skill'
+        '*:name:->name'
       case $state in
         scope) _values 'scope' $scopes ;;
         harness) _values -s , 'harness' $harnesses ;;
-        skill) skills=(all "${(@f)$($words[1] completion values 2>/dev/null)}"); _describe -t skills skill skills ;;
+        name) names=(all "${(@f)$($words[1] completion values 2>/dev/null)}"); _describe -t names name names ;;
       esac
       ;;
     update)
       _arguments -s \
         '--check[report available updates without changing files]' \
         '--binary-only[only update the pa2-skills binary]' \
-        '--skills-only[only update source and managed skills]' \
+        '--skills-only[only update source and managed skills and rules]' \
         '--conflict=[conflict policy]:policy:->conflict'
       case $state in
         conflict) _values 'conflict policy' $conflicts ;;
       esac
       ;;
     status)
-      skills=("${(@f)$($words[1] completion values 2>/dev/null)}"); _describe -t skills skill skills
+      names=("${(@f)$($words[1] completion values 2>/dev/null)}"); _describe -t names name names
       ;;
     discover)
       _files -/
