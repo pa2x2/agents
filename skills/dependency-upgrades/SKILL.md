@@ -128,7 +128,6 @@ Work through the groups the user authorized, in order. Keep each group's changes
 1. Check the worktree. If it has changes you didn't make, leave them out of everything you stage.
 2. Run the project's verification gate once on the unchanged tree and note the warnings and test counts. Later, a warning only counts as "caused by the upgrade" if it wasn't there before. When you can't tell, build the base commit in a separate git worktree and compare.
 3. For dependencies that generate code (SQL, protobuf, GraphQL, ORMs, serializers), save the generated output so you can diff it after the upgrade.
-4. If a library reads or writes a format the project persists (editor markdown, serialized settings, a database), write a characterization test that passes on the current version first. If it still passes after the upgrade, the format survived. If the project has no test for that contract, this test is worth keeping.
 
 ### Apply
 
