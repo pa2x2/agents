@@ -15,7 +15,7 @@ Word every proposal as a change to make, so Keep means "do it" and Drop means "d
 
 Before building the deck, check that the proposals fit together and fit the app as it is. Every option you offer, not only the recommended one, must be possible: check that the libraries, APIs and platform it relies on support it, and leave out the options that aren't. A slide that depends on an earlier slide's choice says which option it assumes. The recommended answers, the small fixes and the later slides must work together. New UI goes on screens and menus that exist, or the slide proposes the new screen and shows how the user gets to it.
 
-Everything you looked at ends up in the deck: as a slide, as a row in a slide of small fixes (each row gets its own decision), or in a "checked" slide with the reason it stays. The user can add a note to a checked item to change it anyway. If the scope is so large that one deck would be tiring to go through, build several complete decks, one per area. Order the slides so each decision comes before the ones that depend on it.
+Each change you propose gets its own slide, or a row in a slide of small fixes (each row gets its own decision). Leave out what you looked at and found nothing to change: no slide or row lists things checked and kept as they are. If the scope is so large that one deck would be tiring to go through, build several complete decks, one per area. Order the slides so each decision comes before the ones that depend on it.
 
 ## 2. Build the deck
 
@@ -40,8 +40,8 @@ The deck reads these attributes from the body. Nothing else is needed for an ans
   - `select`, `input` (`text`, `number`, `range`, and the rest) and `textarea` are values. Set the proposed value in the markup.
 - **A custom widget**, such as a slider or drag-to-rank: put `<input type="hidden" data-answer="key" data-label="...">` in the body. The widget sets its `value` and dispatches a bubbling `input` event. Scripts in a body run after the saved answers are back, so they can read them. A script finds its own slide with `document.currentScript.closest(".dk-slide")`.
 - **Option text**: `data-option="Label"` on a radio, checkbox or select option sets the text the export shows. Without it, the export uses the wrapping label's text (or a select option's own text), then the value.
-- **Per-element decisions**: `data-decision="id" data-label="..."` on any element gives it Keep / Change / Drop and a note box. Use it for small fixes, rows in a list, or checked items you want decided. Ids are unique in the deck.
-- **Notes**: a slide with a bar has a note box. A `textarea` with `data-answer` is a note that the export lists as an answer, which suits checked items.
+- **Per-element decisions**: `data-decision="id" data-label="..."` on any element gives it Keep / Change / Drop and a note box. Use it for small fixes or rows in a list. Ids are unique in the deck.
+- **Notes**: a slide with a bar has a note box. A `textarea` with `data-answer` is a note that the export lists as an answer.
 - **Showing parts**: `data-when="key=value"` on an element shows it only while the slide's answer for `key` is `value`. For a set, it shows while that box is checked. `shot()`'s last argument does the same for a whole visual.
 - A slide set to Change with an empty note leaves its note box highlighted, to ask for the change.
 
@@ -103,6 +103,5 @@ Read each decision like this:
 - **CHANGE**: the user accepts it with the changes in the note. If the note is missing or leaves anything unclear, ask about that slide.
 - **DROP**: rejected. Don't implement it and don't propose it again. A note may say what to do instead; treat that as the decision, and ask if it's unclear.
 - **UNDECIDED**: still open. Ask about it.
-- A checked item with a note: the user wants it changed after all. Ask, or propose it in a follow-up deck.
 
 When notes ask to see something again or for other options ("try again", "show it with more rows"), or the user asks for another pass, answer with the deck, not with options in chat. Add the new slides or answers to the same deck, keeping existing slide and answer ids unchanged so earlier answers stay. Or build a follow-up deck next to it: copy `index.html` to `round2.html`, point its `content.js` script at `round2.js`, and put only the reopened and new slides in that file, with a new `storageKey`. It reuses `visuals.css`, `visuals.js` and the assets. Check it renders and hand it over as above.

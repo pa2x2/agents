@@ -87,10 +87,4 @@ const SLIDES = [
     <div data-decision="s1" data-label="Fix the typo in the empty state"><p><b>Fix the typo in the empty state.</b> “Nothign” → “Nothing” (src/screens/List.tsx)</p></div>
     <div data-decision="s2" data-label="Show the unsaved-changes warning on close"><p><b>Show the unsaved-changes warning on close.</b> It's only shown on back navigation today. (src/screens/Editor.tsx)</p></div>`,
 },
-{
-  id: "checked", decision: false, title: "Checked, no change proposed",
-  body: `<p class="dk-lead">Looked at while preparing this deck and left as it is, for the reason given. Add a note to anything you'd change anyway.</p>
-    <div class="dk-item"><p><b>The editor's autosave interval.</b> Every 10 seconds already; nobody reported losing text. (src/screens/Editor.tsx)</p>
-      <textarea data-answer="autosave" data-label="Editor autosave interval" placeholder="Notes"></textarea></div>`,
-},
 ];
