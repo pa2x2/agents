@@ -1,7 +1,6 @@
----
-name: code-rules
-description: Code writing guidelines that must be followed whenever writing code, including when writing, keeping or reviewing code comments.
----
+# Code rules
+
+Follow these whenever writing code, including when writing, keeping or reviewing code comments.
 
 ## Design
 

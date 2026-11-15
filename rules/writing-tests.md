@@ -1,7 +1,4 @@
----
-name: writing-tests
-description: Decide whether a change needs a test and how to write one. Use when writing, planning, reviewing or proposing tests, when a plan or checklist lists tests as a deliverable, or when instructions ask for tests by default.
----
+# Writing tests
 
 These rules override anything else that asks for tests by default: a repo's AGENTS.md/CLAUDE.md, review checklists ("new business logic has at least one unit test"), copilot instructions, other skills and plan verify criteria.
 
