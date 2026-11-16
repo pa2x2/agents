@@ -64,7 +64,7 @@ var commandHelps = []commandHelp{
   --conflict ask|overwrite|skip    how to resolve skills and rules with local and remote changes (default: ask)
 `,
 	},
-	{name: "list", section: "Install and update", brief: "List available skills and rules", usage: "list", summary: "List skills and rules available from the managed source checkout."},
+	{name: "list", section: "Install and update", brief: "List available skills and rules and where they are installed", usage: "list", summary: "List skills and rules available from the managed source checkout.\nINSTALLED shows the harnesses with a user-scope installation, then after \"project:\" those with one in the current Git project."},
 	{
 		name:    "status",
 		section: "Install and update",

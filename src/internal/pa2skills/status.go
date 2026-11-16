@@ -119,6 +119,40 @@ func (m Manager) ManagedNames() ([]string, error) {
 	return names, nil
 }
 
+// Placement is where an item is installed: the harnesses with a user-scope
+// installation, and those with one in the current Git project.
+type Placement struct {
+	User    []string
+	Project []string
+}
+
+// Placements maps each managed name to its placement, without inspecting
+// targets. Outside a Git project, no installation counts as being in the
+// current project.
+func (m Manager) Placements() (map[string]Placement, error) {
+	installations, err := m.Paths.installations()
+	if err != nil {
+		return nil, err
+	}
+	projectRoot, err := m.projectRoot(ScopeProject)
+	if err != nil {
+		projectRoot = ""
+	}
+	result := map[string]Placement{}
+	for _, stored := range installations {
+		installation := stored.Installation
+		placement := result[installation.Name]
+		switch {
+		case installation.Scope == string(ScopeUser):
+			placement.User = append(placement.User, installation.Harness)
+		case projectRoot != "" && installation.ProjectRoot == projectRoot:
+			placement.Project = append(placement.Project, installation.Harness)
+		}
+		result[installation.Name] = placement
+	}
+	return result, nil
+}
+
 // selectInstallations applies the filter. A name that is neither available nor
 // managed is an error, so a typo does not read as "nothing installed".
 func (m Manager) selectInstallations(filter Filter) ([]storedInstallation, error) {

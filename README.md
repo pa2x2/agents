@@ -44,7 +44,7 @@ Skills and rules share one set of names, and every command below accepts either 
 | `pa2-skills install <name>...\|all [--scope user\|project] [--harness <harnesses>] [--conflict ask\|overwrite\|skip] [--dry-run]` | Install or refresh skills and rules (`all` selects every available one) for the selected scope and comma-separated harnesses (`all` selects every supported harness). Scope defaults to `$PA2_SKILLS_SCOPE` or `user`. `--conflict=overwrite` also replaces local customizations. |
 | `pa2-skills remove <name>...\|all [--scope user\|project] [--harness <harnesses>] [--force] [--dry-run]` | Delete managed installations, from every harness unless `--harness` is given, and stop tracking them; locally customized ones need `--force`. |
 | `pa2-skills update [--check] [--binary-only\|--skills-only] [--conflict ask\|overwrite\|skip]` | Upgrade the binary, pull the source checkout and refresh all managed installations. |
-| `pa2-skills list` | List skills and rules available from the managed source checkout. |
+| `pa2-skills list` | List skills and rules available from the managed source checkout, with the harnesses each is installed for (user scope, then `project:` for the current Git project). |
 | `pa2-skills status [name...] [--scope] [--harness] [-v]` | Show managed installations and whether each is current, outdated, locally modified, diverged, missing, or orphaned. `-v` shows one row per installation with its target. |
 | `pa2-skills diff [name...] [--scope] [--harness]` | Show how installations that are not current differ from the source checkout. |
 | `pa2-skills discover [path]` | Report skills found below the current or supplied directory. |

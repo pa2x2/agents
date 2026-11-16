@@ -372,12 +372,32 @@ func listItems(manager pa2skills.Manager, stdout io.Writer) error {
 	if err != nil {
 		return err
 	}
+	placements, err := manager.Placements()
+	if err != nil {
+		return err
+	}
 	writer := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(writer, "KIND\tNAME")
+	fmt.Fprintln(writer, "KIND\tNAME\tINSTALLED")
 	for _, item := range items {
-		fmt.Fprintf(writer, "%s\t%s\n", item.Kind, item.Name)
+		fmt.Fprintf(writer, "%s\t%s\t%s\n", item.Kind, item.Name, formatPlacement(placements[item.Name]))
 	}
 	return writer.Flush()
+}
+
+// formatPlacement renders user-scope harnesses as is and current-project ones
+// after "project:", for example "claude, codex; project: claude".
+func formatPlacement(placement pa2skills.Placement) string {
+	var parts []string
+	if len(placement.User) > 0 {
+		parts = append(parts, strings.Join(placement.User, ", "))
+	}
+	if len(placement.Project) > 0 {
+		parts = append(parts, "project: "+strings.Join(placement.Project, ", "))
+	}
+	if len(parts) == 0 {
+		return "-"
+	}
+	return strings.Join(parts, "; ")
 }
 
 func showStatus(arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
