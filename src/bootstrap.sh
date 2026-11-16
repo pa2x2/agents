@@ -90,5 +90,13 @@ else
   exit 1
 fi
 
-printf 'Add %s to PATH if necessary, then run: pa2-skills list\n' "$bin_home"
-printf 'Enable zsh completion with: eval "$(pa2-skills completion zsh)"\n'
+case ":$PATH:" in
+*":$bin_home:"*) ;;
+*) printf '%s is not on PATH; add it in your shell profile:\n  export PATH="%s:$PATH"\n' "$bin_home" "$bin_home" ;;
+esac
+case "${SHELL##*/}" in
+zsh) printf 'Enable completion by adding to ~/.zshrc: eval "$(pa2-skills completion zsh)"\n' ;;
+bash) printf 'Enable completion by adding to ~/.bashrc: eval "$(pa2-skills completion bash)"\n' ;;
+fish) printf 'Enable completion by adding to ~/.config/fish/config.fish: pa2-skills completion fish | source\n' ;;
+esac
+printf '%s\n' 'Next: run pa2-skills list to see what is available, then install what you want, for example: pa2-skills install all'
