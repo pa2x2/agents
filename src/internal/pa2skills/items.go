@@ -85,3 +85,43 @@ func (m Manager) findItem(name string) (Item, error) {
 	}
 	return Item{}, fmt.Errorf("%w %q", errUnknownItem, name)
 }
+
+// unknownNameError reports a name that matches no candidate, suggesting the closest one.
+func unknownNameError(name string, candidates []string) error {
+	message := fmt.Sprintf("%q", name)
+	if best := ClosestName(name, candidates); best != "" {
+		message += fmt.Sprintf("; did you mean %q?", best)
+	}
+	return fmt.Errorf("%w %s\nRun 'pa2-skills list' to see available names.", errUnknownItem, message)
+}
+
+// ClosestName returns the candidate within two edits of name, or "" when none is that close.
+func ClosestName(name string, candidates []string) string {
+	best, bestDistance := "", 3
+	for _, candidate := range candidates {
+		if distance := editDistance(name, candidate); distance < bestDistance {
+			best, bestDistance = candidate, distance
+		}
+	}
+	return best
+}
+
+func editDistance(left, right string) int {
+	previous := make([]int, len(right)+1)
+	for index := range previous {
+		previous[index] = index
+	}
+	for i := 1; i <= len(left); i++ {
+		current := make([]int, len(right)+1)
+		current[0] = i
+		for j := 1; j <= len(right); j++ {
+			cost := 1
+			if left[i-1] == right[j-1] {
+				cost = 0
+			}
+			current[j] = min(previous[j]+1, current[j-1]+1, previous[j-1]+cost)
+		}
+		previous = current
+	}
+	return previous[len(right)]
+}

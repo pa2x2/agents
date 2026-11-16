@@ -13,7 +13,7 @@ func TestInstallCopiesSkillAndStoresPrivateState(t *testing.T) {
 	manager, paths := testManager(t)
 	writeSkill(t, paths.SourceRoot, "example", "first")
 
-	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"codex"}, Conflict: ConflictAsk}); err != nil {
 		t.Fatal(err)
 	}
 	target := filepath.Join(paths.Home, ".agents", "skills", "example", "SKILL.md")
@@ -32,11 +32,11 @@ func TestInstallCopiesSkillAndStoresPrivateState(t *testing.T) {
 func TestInstallRefreshesUnmodifiedTarget(t *testing.T) {
 	manager, paths := testManager(t)
 	writeSkill(t, paths.SourceRoot, "example", "first")
-	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"codex"}, Conflict: ConflictAsk}); err != nil {
 		t.Fatal(err)
 	}
 	writeSkill(t, paths.SourceRoot, "example", "second")
-	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"codex"}, Conflict: ConflictAsk}); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, filepath.Join(paths.Home, ".agents", "skills", "example", "SKILL.md")); got != "second" {
@@ -47,35 +47,89 @@ func TestInstallRefreshesUnmodifiedTarget(t *testing.T) {
 func TestInstallPreservesLocalOnlyChange(t *testing.T) {
 	manager, paths := testManager(t)
 	writeSkill(t, paths.SourceRoot, "example", "first")
-	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"codex"}, Conflict: ConflictAsk}); err != nil {
 		t.Fatal(err)
 	}
 	target := filepath.Join(paths.Home, ".agents", "skills", "example", "SKILL.md")
 	writeFile(t, target, "local")
-	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"codex"}, Conflict: ConflictAsk}); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, target); got != "local" {
 		t.Fatalf("target = %q, want local", got)
+	}
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"codex"}, Conflict: ConflictOverwrite}); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, target); got != "first" {
+		t.Fatalf("target after --conflict=overwrite = %q, want first", got)
+	}
+}
+
+func TestInstallContinuesPastUnresolvedConflict(t *testing.T) {
+	manager, paths := testManager(t)
+	writeSkill(t, paths.SourceRoot, "first", "one")
+	writeSkill(t, paths.SourceRoot, "second", "two")
+	unmanaged := filepath.Join(paths.Home, ".claude", "skills", "first", "SKILL.md")
+	writeFile(t, unmanaged, "mine")
+
+	err := manager.Install([]string{NameAll}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"claude"}, Conflict: ConflictAsk})
+	if err == nil {
+		t.Fatal("install with an unresolved conflict succeeded")
+	}
+	if got := readFile(t, unmanaged); got != "mine" {
+		t.Fatalf("conflicting target = %q, want mine", got)
+	}
+	if got := readFile(t, filepath.Join(paths.Home, ".claude", "skills", "second", "SKILL.md")); got != "two" {
+		t.Fatalf("item after the conflict = %q, want two", got)
+	}
+}
+
+func TestDryRunChangesNothing(t *testing.T) {
+	manager, paths := testManager(t)
+	writeSkill(t, paths.SourceRoot, "example", "first")
+	target := filepath.Join(paths.Home, ".claude", "skills", "example")
+
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"claude"}, Conflict: ConflictAsk, DryRun: true}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatalf("dry-run install created the target: %v", err)
+	}
+	if _, err := os.Stat(paths.StateRoot()); !os.IsNotExist(err) {
+		t.Fatalf("dry-run install wrote state: %v", err)
+	}
+
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"claude"}, Conflict: ConflictAsk}); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.Remove([]string{"example"}, RemoveOptions{Scope: ScopeUser, DryRun: true}); err != nil {
+		t.Fatal(err)
+	}
+	if got := readFile(t, filepath.Join(target, "SKILL.md")); got != "first" {
+		t.Fatalf("target after dry-run remove = %q, want first", got)
+	}
+	if statuses, err := manager.Status(Filter{}); err != nil || len(statuses) != 1 {
+		t.Fatalf("statuses after dry-run remove = %v, %v; want one", statuses, err)
 	}
 }
 
 func TestInstallRespectsConflictPolicy(t *testing.T) {
 	manager, paths := testManager(t)
 	writeSkill(t, paths.SourceRoot, "example", "first")
-	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"codex"}, Conflict: ConflictAsk}); err != nil {
 		t.Fatal(err)
 	}
 	target := filepath.Join(paths.Home, ".agents", "skills", "example", "SKILL.md")
 	writeFile(t, target, "local")
 	writeSkill(t, paths.SourceRoot, "example", "remote")
-	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictSkip); err != nil {
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"codex"}, Conflict: ConflictSkip}); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, target); got != "local" {
 		t.Fatalf("skipped target = %q, want local", got)
 	}
-	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictOverwrite); err != nil {
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"codex"}, Conflict: ConflictOverwrite}); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, target); got != "remote" {
@@ -89,13 +143,13 @@ func TestInstallAdoptsExistingCustomizedTarget(t *testing.T) {
 	target := filepath.Join(paths.Home, ".agents", "skills", "example", "SKILL.md")
 	writeFile(t, target, "team-customized")
 
-	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictSkip); err != nil {
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"codex"}, Conflict: ConflictSkip}); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, target); got != "team-customized" {
 		t.Fatalf("target = %q, want team-customized", got)
 	}
-	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictSkip); err != nil {
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"codex"}, Conflict: ConflictSkip}); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, target); got != "team-customized" {
@@ -152,7 +206,7 @@ func TestInstallAllInstallsEverySkill(t *testing.T) {
 	writeSkill(t, paths.SourceRoot, "first", "one")
 	writeSkill(t, paths.SourceRoot, "second", "two")
 
-	if err := manager.Install([]string{"second", NameAll}, ScopeUser, []string{"claude"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"second", NameAll}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"claude"}, Conflict: ConflictAsk}); err != nil {
 		t.Fatal(err)
 	}
 	for name, want := range map[string]string{"first": "one", "second": "two"} {
@@ -166,7 +220,7 @@ func TestInstallReportsCurrentInstallation(t *testing.T) {
 	manager, paths := testManager(t)
 	writeSkill(t, paths.SourceRoot, "example", "first")
 	for range 2 {
-		if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+		if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"codex"}, Conflict: ConflictAsk}); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -178,10 +232,10 @@ func TestInstallReportsCurrentInstallation(t *testing.T) {
 func TestRemoveDeletesManagedInstallation(t *testing.T) {
 	manager, paths := testManager(t)
 	writeSkill(t, paths.SourceRoot, "example", "first")
-	if err := manager.Install([]string{"example"}, ScopeUser, []string{"claude", "codex"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"claude", "codex"}, Conflict: ConflictAsk}); err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.Remove([]string{"example"}, ScopeUser, []string{"claude"}, false); err != nil {
+	if err := manager.Remove([]string{"example"}, RemoveOptions{Scope: ScopeUser, Harnesses: []string{"claude"}}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(filepath.Join(paths.Home, ".claude", "skills", "example")); !os.IsNotExist(err) {
@@ -190,7 +244,7 @@ func TestRemoveDeletesManagedInstallation(t *testing.T) {
 	if got := readFile(t, filepath.Join(paths.Home, ".agents", "skills", "example", "SKILL.md")); got != "first" {
 		t.Fatalf("codex target = %q, want first", got)
 	}
-	if err := manager.Remove([]string{"example"}, ScopeUser, []string{"claude"}, false); err == nil {
+	if err := manager.Remove([]string{"example"}, RemoveOptions{Scope: ScopeUser, Harnesses: []string{"claude"}}); err == nil {
 		t.Fatal("removing an untracked installation succeeded")
 	}
 }
@@ -198,18 +252,18 @@ func TestRemoveDeletesManagedInstallation(t *testing.T) {
 func TestRemoveKeepsLocalChangesUnlessForced(t *testing.T) {
 	manager, paths := testManager(t)
 	writeSkill(t, paths.SourceRoot, "example", "first")
-	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"codex"}, Conflict: ConflictAsk}); err != nil {
 		t.Fatal(err)
 	}
 	target := filepath.Join(paths.Home, ".agents", "skills", "example", "SKILL.md")
 	writeFile(t, target, "local")
-	if err := manager.Remove([]string{NameAll}, ScopeUser, Harnesses, false); err != nil {
+	if err := manager.Remove([]string{NameAll}, RemoveOptions{Scope: ScopeUser, Harnesses: Harnesses}); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, target); got != "local" {
 		t.Fatalf("target = %q, want local", got)
 	}
-	if err := manager.Remove([]string{NameAll}, ScopeUser, Harnesses, true); err != nil {
+	if err := manager.Remove([]string{NameAll}, RemoveOptions{Scope: ScopeUser, Harnesses: Harnesses, Force: true}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := os.Stat(target); !os.IsNotExist(err) {
@@ -223,14 +277,14 @@ func TestRemoveKeepsLocalChangesUnlessForced(t *testing.T) {
 func TestInstallRestoresDeletedManagedTarget(t *testing.T) {
 	manager, paths := testManager(t)
 	writeSkill(t, paths.SourceRoot, "example", "first")
-	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"codex"}, Conflict: ConflictAsk}); err != nil {
 		t.Fatal(err)
 	}
 	target := filepath.Join(paths.Home, ".agents", "skills", "example")
 	if err := os.RemoveAll(target); err != nil {
 		t.Fatal(err)
 	}
-	if err := manager.Install([]string{"example"}, ScopeUser, []string{"codex"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"codex"}, Conflict: ConflictAsk}); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, filepath.Join(target, "SKILL.md")); got != "first" {
@@ -241,14 +295,14 @@ func TestInstallRestoresDeletedManagedTarget(t *testing.T) {
 func TestStatusClassifiesInstallations(t *testing.T) {
 	manager, paths := testManager(t)
 	writeSkill(t, paths.SourceRoot, "example", "first")
-	if err := manager.Install([]string{"example"}, ScopeUser, []string{"claude", "codex", "opencode"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"example"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"claude", "codex", "opencode"}, Conflict: ConflictAsk}); err != nil {
 		t.Fatal(err)
 	}
 	writeFile(t, filepath.Join(paths.Home, ".claude", "skills", "example", "SKILL.md"), "local")
 	if err := os.RemoveAll(filepath.Join(paths.ConfigHome, "opencode", "skills", "example")); err != nil {
 		t.Fatal(err)
 	}
-	statuses, err := manager.Status(nil)
+	statuses, err := manager.Status(Filter{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -263,7 +317,7 @@ func TestStatusClassifiesInstallations(t *testing.T) {
 		}
 	}
 	writeSkill(t, paths.SourceRoot, "example", "second")
-	if statuses, err = manager.Status([]string{"example"}); err != nil {
+	if statuses, err = manager.Status(Filter{Names: []string{"example"}}); err != nil {
 		t.Fatal(err)
 	}
 	for _, status := range statuses {
@@ -279,21 +333,23 @@ func TestPromptConflictAcceptsShortcuts(t *testing.T) {
 		"o\n":             ConflictOverwrite,
 		"O\n":             ConflictOverwrite,
 		"overwrite\n":     ConflictOverwrite,
-		"a\n":             ConflictAllOverwrite,
-		"all-overwrite\n": ConflictAllOverwrite,
+		"a\n":             conflictAllOverwrite,
+		"all-overwrite\n": conflictAllOverwrite,
 		"s\n":             ConflictSkip,
+		"k\n":             conflictAllSkip,
 		"x\ns\n":          ConflictSkip,
+		"\ns\n":           ConflictSkip,
 	}
 	for input, want := range cases {
 		manager := Manager{Stdin: strings.NewReader(input), Stdout: &bytes.Buffer{}}
-		got, err := manager.promptConflict("conflict", Installation{Kind: KindSkill}, "source", "cancelled")
+		got, err := manager.promptConflict("conflict", Installation{Kind: KindSkill}, "source")
 		if err != nil || got != want {
 			t.Errorf("input %q: got %q, %v; want %q", input, got, err, want)
 		}
 	}
-	for _, input := range []string{"q\n", "quit\n", "\n"} {
+	for _, input := range []string{"q\n", "quit\n", "\n", ""} {
 		manager := Manager{Stdin: strings.NewReader(input), Stdout: &bytes.Buffer{}}
-		if _, err := manager.promptConflict("conflict", Installation{Kind: KindSkill}, "source", "cancelled"); err == nil || err.Error() != "cancelled" {
+		if _, err := manager.promptConflict("conflict", Installation{Kind: KindSkill}, "source"); err == nil || err.Error() != "cancelled" {
 			t.Errorf("input %q: err = %v, want cancelled", input, err)
 		}
 	}
@@ -306,7 +362,7 @@ func TestRuleBlockLeavesUserTextUntouched(t *testing.T) {
 	original := "# Mine\n\nkeep this\n"
 	writeFile(t, target, original)
 
-	if err := manager.Install([]string{"commits"}, ScopeUser, []string{"claude"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"commits"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"claude"}, Conflict: ConflictAsk}); err != nil {
 		t.Fatal(err)
 	}
 	want := original + "\n<!-- pa2-skills:begin commits -->\n# Commits\n\nfirst\n<!-- pa2-skills:end commits -->\n"
@@ -316,18 +372,18 @@ func TestRuleBlockLeavesUserTextUntouched(t *testing.T) {
 
 	writeFile(t, target, readFile(t, target)+"\nadded after\n")
 	writeFile(t, filepath.Join(paths.SourceRoot, "rules", "commits.md"), "second\n")
-	if err := manager.Install([]string{"commits"}, ScopeUser, []string{"claude"}, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"commits"}, InstallOptions{Scope: ScopeUser, Harnesses: []string{"claude"}, Conflict: ConflictAsk}); err != nil {
 		t.Fatal(err)
 	}
 	want = original + "\n<!-- pa2-skills:begin commits -->\nsecond\n<!-- pa2-skills:end commits -->\n\nadded after\n"
 	if got := readFile(t, target); got != want {
 		t.Fatalf("updated = %q, want %q", got, want)
 	}
-	if statuses, err := manager.Status(nil); err != nil || len(statuses) != 1 || statuses[0].Status != StatusCurrent {
+	if statuses, err := manager.Status(Filter{}); err != nil || len(statuses) != 1 || statuses[0].Status != StatusCurrent {
 		t.Fatalf("statuses = %v, %v; want one current", statuses, err)
 	}
 
-	if err := manager.Remove([]string{"commits"}, ScopeUser, []string{"claude"}, false); err != nil {
+	if err := manager.Remove([]string{"commits"}, RemoveOptions{Scope: ScopeUser, Harnesses: []string{"claude"}}); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, target); got != original+"\nadded after\n" {
@@ -349,7 +405,7 @@ func TestProjectRuleSharedBySeveralHarnesses(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := manager.Install([]string{"commits"}, ScopeProject, Harnesses, ConflictAsk); err != nil {
+	if err := manager.Install([]string{"commits"}, InstallOptions{Scope: ScopeProject, Harnesses: Harnesses, Conflict: ConflictAsk}); err != nil {
 		t.Fatal(err)
 	}
 	want := "# Project\n\n<!-- pa2-skills:begin commits -->\nrule\n<!-- pa2-skills:end commits -->\n"
@@ -360,13 +416,13 @@ func TestProjectRuleSharedBySeveralHarnesses(t *testing.T) {
 		t.Fatalf("CLAUDE.md is no longer a symlink: %v", err)
 	}
 
-	if err := manager.Remove([]string{"commits"}, ScopeProject, []string{"claude", "codex"}, false); err != nil {
+	if err := manager.Remove([]string{"commits"}, RemoveOptions{Scope: ScopeProject, Harnesses: []string{"claude", "codex"}}); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, agents); got != want {
 		t.Fatalf("AGENTS.md = %q, want the block kept for opencode", got)
 	}
-	if err := manager.Remove([]string{"commits"}, ScopeProject, []string{"opencode"}, false); err != nil {
+	if err := manager.Remove([]string{"commits"}, RemoveOptions{Scope: ScopeProject, Harnesses: []string{"opencode"}}); err != nil {
 		t.Fatal(err)
 	}
 	if got := readFile(t, agents); got != "# Project\n" {

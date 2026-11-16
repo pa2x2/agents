@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 )
 
 type Paths struct {
@@ -44,6 +45,34 @@ func ResolvePaths() (Paths, error) {
 		ConfigHome: configHome,
 		SourceRoot: sourceRoot,
 	}, nil
+}
+
+// Display shortens a path below the home directory to start with ~.
+func (p Paths) Display(path string) string {
+	if p.Home == "" {
+		return path
+	}
+	if path == p.Home {
+		return "~"
+	}
+	if rest, found := strings.CutPrefix(path, p.Home+string(filepath.Separator)); found {
+		return "~/" + rest
+	}
+	return path
+}
+
+// harnessHome is the directory a harness keeps its user configuration in; it
+// exists once the harness has been used on this machine.
+func (p Paths) harnessHome(harness string) string {
+	switch harness {
+	case "claude":
+		return filepath.Join(p.Home, ".claude")
+	case "codex":
+		return filepath.Join(p.Home, ".codex")
+	case "opencode":
+		return filepath.Join(p.ConfigHome, "opencode")
+	}
+	return ""
 }
 
 func (p Paths) StateRoot() string {

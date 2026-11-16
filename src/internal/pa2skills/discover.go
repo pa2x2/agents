@@ -59,18 +59,18 @@ func (m Manager) Discover(root string) ([]Discovery, error) {
 			return err
 		}
 		name := entry.Name()
-		finding := Discovery{Status: "FOUND", Path: path, Name: name}
+		finding := Discovery{Status: "found", Path: path, Name: name}
 		if !skillInfo.Mode().IsRegular() {
-			finding.Status = "INVALID"
+			finding.Status = "invalid"
 			finding.Detail = "SKILL.md is not a regular file"
 		} else if err := ValidateName(name); err != nil {
-			finding.Status = "INVALID"
+			finding.Status = "invalid"
 			finding.Detail = err.Error()
 		} else if declared, err := declaredSkillName(skillFile); err != nil {
-			finding.Status = "INVALID"
+			finding.Status = "invalid"
 			finding.Detail = err.Error()
 		} else if declared != "" && declared != name {
-			finding.Status = "INVALID"
+			finding.Status = "invalid"
 			finding.Detail = fmt.Sprintf("frontmatter name %q differs from directory name", declared)
 		} else if status, detail, err := m.trackedStatus(path, name); err != nil {
 			return err
@@ -87,13 +87,13 @@ func (m Manager) Discover(root string) ([]Discovery, error) {
 
 	counts := map[string]int{}
 	for _, finding := range findings {
-		if finding.Status != "INVALID" {
+		if finding.Status != "invalid" {
 			counts[finding.Name]++
 		}
 	}
 	for index := range findings {
-		if findings[index].Status != "INVALID" && counts[findings[index].Name] > 1 {
-			findings[index].Status = "CONFLICT"
+		if findings[index].Status != "invalid" && counts[findings[index].Name] > 1 {
+			findings[index].Status = "conflict"
 			findings[index].Detail = "multiple discovered skills use this name"
 		}
 	}
@@ -167,16 +167,16 @@ func (m Manager) trackedStatus(path, name string) (string, string, error) {
 		return "", "", err
 	}
 	if trackedHash == "" {
-		return "FOUND", "", nil
+		return "found", "", nil
 	}
 	discoveredHash, err := treeHash(path)
 	if err != nil {
 		return "", "", err
 	}
 	if discoveredHash == trackedHash {
-		return "TRACKED", "identical to managed skill", nil
+		return "tracked", "identical to managed skill", nil
 	}
-	return "CONFLICT", "tracked skill has different contents", nil
+	return "conflict", "tracked skill has different contents", nil
 }
 
 func shouldSkipDiscoveryDirectory(name string) bool {

@@ -52,10 +52,10 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		}
 		fmt.Fprintln(stdout, version)
 		return nil
-	case "install", "sync":
-		return installOrSync(arguments[0], arguments[1:], manager)
+	case "install":
+		return installItems(arguments[1:], manager)
 	case "remove":
-		return removeSkills(arguments[1:], manager)
+		return removeItems(arguments[1:], manager)
 	case "update":
 		return updateInstallation(arguments[1:], manager, stdout, stderr)
 	case "list":
@@ -65,6 +65,8 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 		return listItems(manager, stdout)
 	case "status":
 		return showStatus(arguments[1:], manager, stdout)
+	case "diff":
+		return showDiff(arguments[1:], manager)
 	case "discover":
 		return discoverSkills(arguments[1:], manager, stdout)
 	case "add":
@@ -91,54 +93,16 @@ func run(arguments []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	}
 }
 
-func printHelp(arguments []string, stdout io.Writer) error {
-	if len(arguments) > 1 {
-		return errors.New("usage: pa2-skills help [command]")
-	}
-	if len(arguments) == 0 {
-		printUsage(stdout)
-		return nil
-	}
-	help, found := lookupCommand(arguments[0])
-	if !found {
-		return unknownCommand(arguments[0])
-	}
-	printCommandHelp(stdout, help)
-	return nil
-}
-
 func unknownCommand(name string) error {
 	message := fmt.Sprintf("unknown command %q", name)
-	best, bestDistance := "", 3
+	names := make([]string, 0, len(commandHelps))
 	for _, help := range commandHelps {
-		if distance := editDistance(name, help.name); distance < bestDistance {
-			best, bestDistance = help.name, distance
-		}
+		names = append(names, help.name)
 	}
-	if best != "" {
+	if best := pa2skills.ClosestName(name, names); best != "" {
 		message += fmt.Sprintf("; did you mean %q?", best)
 	}
 	return errors.New(message + "\nRun 'pa2-skills help' for usage.")
-}
-
-func editDistance(left, right string) int {
-	previous := make([]int, len(right)+1)
-	for index := range previous {
-		previous[index] = index
-	}
-	for i := 1; i <= len(left); i++ {
-		current := make([]int, len(right)+1)
-		current[0] = i
-		for j := 1; j <= len(right); j++ {
-			cost := 1
-			if left[i-1] == right[j-1] {
-				cost = 0
-			}
-			current[j] = min(previous[j]+1, current[j-1]+1, previous[j-1]+cost)
-		}
-		previous = current
-	}
-	return previous[len(right)]
 }
 
 func hasHelpFlag(arguments []string) bool {
@@ -156,6 +120,9 @@ func hasHelpFlag(arguments []string) bool {
 // parseArguments parses flags that may appear before, between, or after positional arguments.
 // Arguments after a literal "--" are always positional.
 func parseArguments(flags *flag.FlagSet, arguments []string) ([]string, error) {
+	if err := checkFlags(flags, arguments); err != nil {
+		return nil, fmt.Errorf("%w\nRun 'pa2-skills help %s' for usage.", err, flags.Name())
+	}
 	var positionals []string
 	for {
 		if err := flags.Parse(arguments); err != nil {
@@ -172,6 +139,39 @@ func parseArguments(flags *flag.FlagSet, arguments []string) ([]string, error) {
 		positionals = append(positionals, remaining[0])
 		arguments = remaining[1:]
 	}
+}
+
+// checkFlags reports unknown flags and missing flag values before the flag
+// package does, because it names flags with a single dash and suggests nothing.
+func checkFlags(flags *flag.FlagSet, arguments []string) error {
+	for index := 0; index < len(arguments); index++ {
+		argument := arguments[index]
+		if argument == "--" {
+			return nil
+		}
+		if len(argument) < 2 || argument[0] != '-' {
+			continue
+		}
+		name, _, hasValue := strings.Cut(strings.TrimLeft(argument, "-"), "=")
+		defined := flags.Lookup(name)
+		if defined == nil {
+			var names []string
+			flags.VisitAll(func(candidate *flag.Flag) { names = append(names, candidate.Name) })
+			message := fmt.Sprintf("unknown flag --%s", name)
+			if best := pa2skills.ClosestName(name, names); best != "" {
+				message += fmt.Sprintf("; did you mean --%s?", best)
+			}
+			return errors.New(message)
+		}
+		if boolean, ok := defined.Value.(interface{ IsBoolFlag() bool }); hasValue || ok && boolean.IsBoolFlag() {
+			continue
+		}
+		if index+1 == len(arguments) {
+			return fmt.Errorf("--%s needs a value", name)
+		}
+		index++
+	}
+	return nil
 }
 
 // newFlagSet returns a flag set whose errors are reported only through the returned error.
@@ -194,17 +194,16 @@ func discoverSkills(arguments []string, manager pa2skills.Manager, stdout io.Wri
 	if err != nil {
 		return err
 	}
-	for _, finding := range findings {
-		line := fmt.Sprintf("%-8s  %s  %s", finding.Status, finding.Path, finding.Name)
-		if finding.Detail != "" {
-			line += "  " + finding.Detail
-		}
-		fmt.Fprintln(stdout, line)
-	}
 	if len(findings) == 0 {
 		fmt.Fprintln(stdout, "No skills found.")
+		return nil
 	}
-	return nil
+	writer := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
+	fmt.Fprintln(writer, "STATUS\tNAME\tPATH\tDETAIL")
+	for _, finding := range findings {
+		fmt.Fprintf(writer, "%s\t%s\t%s\t%s\n", finding.Status, finding.Name, manager.Paths.Display(finding.Path), finding.Detail)
+	}
+	return writer.Flush()
 }
 
 func addSkill(arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
@@ -237,53 +236,79 @@ func addSkill(arguments []string, manager pa2skills.Manager, stdout io.Writer) e
 	if err != nil {
 		return err
 	}
-	fmt.Fprintf(stdout, "Added %s\nSource:  %s\nTracked: %s\n\nReview and publish manually:\n  pa2-skills cd\n  git status\n", filepath.Base(target), source, target)
+	fmt.Fprintf(stdout, "Added %s\nSource:  %s\nTracked: %s\n\nReview and publish manually:\n  pa2-skills cd\n  git status\n", filepath.Base(target), source, manager.Paths.Display(target))
 	return nil
 }
 
-// targetFlags registers the --scope and --harness flags shared by commands that select installations.
+// targetFlags registers the --scope and --harness flags of commands that change installations.
 func targetFlags(flags *flag.FlagSet) (*string, *string) {
 	scope := flags.String("scope", environmentDefault("PA2_SKILLS_SCOPE", string(pa2skills.ScopeUser)), "user or project")
 	harnesses := flags.String("harness", environmentDefault("PA2_SKILLS_HARNESS", ""), "comma-separated harnesses, or all")
 	return scope, harnesses
 }
 
-func removeSkills(arguments []string, manager pa2skills.Manager) error {
+// filterFlags registers the --scope and --harness flags of commands that only
+// inspect installations. They default to every scope and harness.
+func filterFlags(flags *flag.FlagSet) (*string, *string) {
+	scope := flags.String("scope", "", "user or project")
+	harnesses := flags.String("harness", "", "comma-separated harnesses, or all")
+	return scope, harnesses
+}
+
+func parseFilter(command string, arguments []string, register func(*flag.FlagSet)) (pa2skills.Filter, error) {
+	flags := newFlagSet(command)
+	scope, harnesses := filterFlags(flags)
+	if register != nil {
+		register(flags)
+	}
+	names, err := parseArguments(flags, arguments)
+	if err != nil {
+		return pa2skills.Filter{}, err
+	}
+	filter := pa2skills.Filter{Names: names, Scope: pa2skills.Scope(*scope), Harnesses: pa2skills.ExpandHarnesses(splitValues(*harnesses))}
+	return filter, invalidArguments(pa2skills.ValidateFilter(filter))
+}
+
+func removeItems(arguments []string, manager pa2skills.Manager) error {
 	flags := newFlagSet("remove")
 	scope, harnesses := targetFlags(flags)
 	force := flags.Bool("force", false, "remove installations with local changes")
-	positionals, err := parseArguments(flags, arguments)
+	dryRun := flags.Bool("dry-run", false, "report what would change without changing files")
+	names, err := parseArguments(flags, arguments)
 	if err != nil {
 		return err
 	}
-	selectedHarnesses := pa2skills.ExpandHarnesses(splitValues(*harnesses))
-	if err := pa2skills.ValidateInstallArguments(positionals, pa2skills.Scope(*scope), selectedHarnesses, pa2skills.ConflictAsk); err != nil {
-		return invalidArguments(err)
+	options := pa2skills.RemoveOptions{
+		Scope:     pa2skills.Scope(*scope),
+		Harnesses: pa2skills.ExpandHarnesses(splitValues(*harnesses)),
+		Force:     *force,
+		DryRun:    *dryRun,
 	}
-	return manager.Remove(positionals, pa2skills.Scope(*scope), selectedHarnesses, *force)
+	if err := invalidArguments(pa2skills.ValidateRemove(names, options)); err != nil {
+		return err
+	}
+	return manager.Remove(names, options)
 }
 
-func installOrSync(command string, arguments []string, manager pa2skills.Manager) error {
-	flags := newFlagSet(command)
+func installItems(arguments []string, manager pa2skills.Manager) error {
+	flags := newFlagSet("install")
 	scope, harnesses := targetFlags(flags)
 	conflict := flags.String("conflict", "ask", "ask, overwrite, or skip")
-	positionals, err := parseArguments(flags, arguments)
+	dryRun := flags.Bool("dry-run", false, "report what would change without changing files")
+	names, err := parseArguments(flags, arguments)
 	if err != nil {
 		return err
 	}
-	var validationErrors []error
-	policy := pa2skills.ConflictPolicy(*conflict)
-	selectedHarnesses := pa2skills.ExpandHarnesses(splitValues(*harnesses))
-	if err := pa2skills.ValidateInstallArguments(positionals, pa2skills.Scope(*scope), selectedHarnesses, policy); err != nil {
-		validationErrors = append(validationErrors, err)
+	options := pa2skills.InstallOptions{
+		Scope:     pa2skills.Scope(*scope),
+		Harnesses: pa2skills.ExpandHarnesses(splitValues(*harnesses)),
+		Conflict:  pa2skills.ConflictPolicy(*conflict),
+		DryRun:    *dryRun,
 	}
-	if err := invalidArguments(validationErrors...); err != nil {
+	if err := invalidArguments(pa2skills.ValidateInstall(names, options)); err != nil {
 		return err
 	}
-	if command == "install" {
-		return manager.Install(positionals, pa2skills.Scope(*scope), selectedHarnesses, policy)
-	}
-	return manager.Sync(positionals, pa2skills.Scope(*scope), selectedHarnesses, policy)
+	return manager.Install(names, options)
 }
 
 func updateInstallation(arguments []string, manager pa2skills.Manager, stdout, stderr io.Writer) error {
@@ -304,9 +329,7 @@ func updateInstallation(arguments []string, manager pa2skills.Manager, stdout, s
 		validationErrors = append(validationErrors, errors.New("--binary-only and --skills-only cannot be used together"))
 	}
 	policy := pa2skills.ConflictPolicy(*conflict)
-	if policy != pa2skills.ConflictAsk && policy != pa2skills.ConflictOverwrite && policy != pa2skills.ConflictSkip {
-		validationErrors = append(validationErrors, errors.New("--conflict must be ask, overwrite, or skip"))
-	}
+	validationErrors = append(validationErrors, pa2skills.ValidateConflictPolicy(policy))
 	if err := invalidArguments(validationErrors...); err != nil {
 		return err
 	}
@@ -358,12 +381,15 @@ func listItems(manager pa2skills.Manager, stdout io.Writer) error {
 }
 
 func showStatus(arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
-	flags := newFlagSet("status")
-	names, err := parseArguments(flags, arguments)
+	var verbose bool
+	filter, err := parseFilter("status", arguments, func(flags *flag.FlagSet) {
+		flags.BoolVar(&verbose, "verbose", false, "one row per installation, with its target")
+		flags.BoolVar(&verbose, "v", false, "one row per installation, with its target")
+	})
 	if err != nil {
 		return err
 	}
-	statuses, err := manager.Status(names)
+	statuses, err := manager.Status(filter)
 	if err != nil {
 		return err
 	}
@@ -372,12 +398,85 @@ func showStatus(arguments []string, manager pa2skills.Manager, stdout io.Writer)
 		return nil
 	}
 	writer := tabwriter.NewWriter(stdout, 0, 0, 2, ' ', 0)
-	fmt.Fprintln(writer, "STATUS\tKIND\tNAME\tHARNESS\tSCOPE\tTARGET")
+	if verbose {
+		fmt.Fprintln(writer, "STATUS\tKIND\tNAME\tSCOPE\tHARNESS\tTARGET")
+		for _, status := range statuses {
+			installation := status.Installation
+			fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\t%s\n", status.Status, installation.Kind, installation.Name, installation.Scope, installation.Harness, manager.Paths.Display(installation.Target))
+		}
+	} else {
+		fmt.Fprintln(writer, "STATUS\tKIND\tNAME\tSCOPE\tHARNESSES")
+		for _, row := range groupStatuses(statuses) {
+			scope := row.Installation.Scope
+			if row.Installation.ProjectRoot != "" {
+				scope += " " + manager.Paths.Display(row.Installation.ProjectRoot)
+			}
+			fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\n", row.Status, row.Installation.Kind, row.Installation.Name, scope, strings.Join(row.harnesses, ", "))
+		}
+	}
+	if err := writer.Flush(); err != nil {
+		return err
+	}
+	printStatusSummary(stdout, statuses)
+	return nil
+}
+
+type statusRow struct {
+	pa2skills.InstallationStatus
+	harnesses []string
+}
+
+// groupStatuses merges installations of one item at one location that share a
+// status into a single row listing their harnesses.
+func groupStatuses(statuses []pa2skills.InstallationStatus) []statusRow {
+	type key struct{ status, name, scope, projectRoot string }
+	var rows []statusRow
+	index := map[key]int{}
 	for _, status := range statuses {
 		installation := status.Installation
-		fmt.Fprintf(writer, "%s\t%s\t%s\t%s\t%s\t%s\n", status.Status, installation.Kind, installation.Name, installation.Harness, installation.Scope, installation.Target)
+		rowKey := key{status.Status, installation.Name, installation.Scope, installation.ProjectRoot}
+		if position, found := index[rowKey]; found {
+			rows[position].harnesses = append(rows[position].harnesses, installation.Harness)
+			continue
+		}
+		index[rowKey] = len(rows)
+		rows = append(rows, statusRow{status, []string{installation.Harness}})
 	}
-	return writer.Flush()
+	return rows
+}
+
+func printStatusSummary(stdout io.Writer, statuses []pa2skills.InstallationStatus) {
+	counts := map[string]int{}
+	for _, status := range statuses {
+		counts[status.Status]++
+	}
+	var parts []string
+	for _, status := range pa2skills.Statuses {
+		if counts[status] > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", counts[status], status))
+		}
+	}
+	fmt.Fprintf(stdout, "\n%d installation(s): %s.\n", len(statuses), strings.Join(parts, ", "))
+	if counts[pa2skills.StatusOutdated] > 0 {
+		fmt.Fprintln(stdout, "Run 'pa2-skills update' to refresh outdated installations.")
+	}
+	if counts[pa2skills.StatusModified]+counts[pa2skills.StatusDiverged] > 0 {
+		fmt.Fprintln(stdout, "Run 'pa2-skills diff' to see local changes.")
+	}
+	if counts[pa2skills.StatusMissing] > 0 {
+		fmt.Fprintln(stdout, "Run 'pa2-skills install <name>' to restore missing installations, or 'pa2-skills remove <name>' to stop tracking them.")
+	}
+	if counts[pa2skills.StatusOrphaned] > 0 {
+		fmt.Fprintln(stdout, "Run 'pa2-skills remove <name>' to stop tracking orphaned installations.")
+	}
+}
+
+func showDiff(arguments []string, manager pa2skills.Manager) error {
+	filter, err := parseFilter("diff", arguments, nil)
+	if err != nil {
+		return err
+	}
+	return manager.Diff(filter)
 }
 
 func changeDirectory(arguments []string, sourceRoot string, stdin io.Reader, stdout, stderr io.Writer) error {
@@ -389,6 +488,12 @@ func changeDirectory(arguments []string, sourceRoot string, stdin io.Reader, std
 		directory = filepath.Join(sourceRoot, arguments[0])
 	}
 	resolved, err := filepath.EvalSymlinks(directory)
+	if os.IsNotExist(err) && len(arguments) == 0 {
+		return fmt.Errorf("the managed source checkout %s does not exist; run the bootstrap script", sourceRoot)
+	}
+	if os.IsNotExist(err) {
+		return fmt.Errorf("%s does not exist in the managed source checkout at %s", arguments[0], sourceRoot)
+	}
 	if err != nil {
 		return fmt.Errorf("resolve source path: %w", err)
 	}
@@ -407,52 +512,6 @@ func changeDirectory(arguments []string, sourceRoot string, stdin io.Reader, std
 	child.Stderr = stderr
 	child.Env = append(os.Environ(), "PA2_SKILLS_SOURCE_DIR="+sourceRoot)
 	return child.Run()
-}
-
-func completion(arguments []string, manager pa2skills.Manager, stdout io.Writer) error {
-	var validationErrors []error
-	if len(arguments) == 0 {
-		validationErrors = append(validationErrors, errors.New("completion format is required (zsh or values)"))
-	} else if arguments[0] != "zsh" && arguments[0] != "values" {
-		validationErrors = append(validationErrors, fmt.Errorf("unsupported completion format %q (supported: zsh, values)", arguments[0]))
-	}
-	if len(arguments) > 1 {
-		validationErrors = append(validationErrors, fmt.Errorf("unexpected argument(s): %s", strings.Join(arguments[1:], ", ")))
-	}
-	if err := invalidArguments(validationErrors...); err != nil {
-		return err
-	}
-	switch arguments[0] {
-	case "zsh":
-		fmt.Fprint(stdout, zshCompletion)
-		return nil
-	case "values":
-		items, err := manager.Items()
-		if err != nil {
-			return err
-		}
-		for _, item := range items {
-			fmt.Fprintln(stdout, item.Name)
-		}
-		return nil
-	}
-	return nil
-}
-
-func doctor(manager pa2skills.Manager, stdout io.Writer) error {
-	var validationErrors []error
-	if _, err := os.Stat(filepath.Join(manager.Paths.SourceRoot, ".git")); err != nil {
-		validationErrors = append(validationErrors, fmt.Errorf("managed source checkout is unavailable at %s; run the bootstrap script", manager.Paths.SourceRoot))
-	}
-	if _, err := exec.LookPath("git"); err != nil {
-		validationErrors = append(validationErrors, errors.New("git is required"))
-	}
-	if err := errors.Join(validationErrors...); err != nil {
-		return err
-	}
-	fmt.Fprintf(stdout, "Source checkout: %s\n", manager.Paths.SourceRoot)
-	fmt.Fprintf(stdout, "Private state: %s\n", manager.Paths.StateRoot())
-	return nil
 }
 
 func invalidArguments(validationErrors ...error) error {
@@ -487,208 +546,3 @@ func splitValues(value string) []string {
 	sort.Strings(result)
 	return result
 }
-
-type commandHelp struct {
-	name    string
-	usage   string
-	summary string
-	details string
-}
-
-var commandHelps = []commandHelp{
-	{
-		name:    "install",
-		usage:   "install <name>...|all [--scope user|project] --harness <harnesses>|all [--conflict ask|overwrite|skip]",
-		summary: "Install skills and rules from the managed source checkout, or refresh existing installations. all selects every available skill and rule.\nA rule is written between pa2-skills markers in the harness's CLAUDE.md or AGENTS.md; text outside the markers is never changed.",
-		details: installFlagsHelp,
-	},
-	{
-		name:    "sync",
-		usage:   "sync <name>...|all [--scope user|project] --harness <harnesses>|all [--conflict ask|overwrite|skip]",
-		summary: "Fetch the source repository, then install or refresh skills and rules. all selects every available skill and rule.",
-		details: installFlagsHelp,
-	},
-	{
-		name:    "remove",
-		usage:   "remove <name>...|all [--scope user|project] --harness <harnesses>|all [--force]",
-		summary: "Delete managed installations and stop tracking them. all selects every managed installation in the scope.\nFiles and rule text pa2-skills did not install are never touched.",
-		details: `Flags:
-  --scope user|project             remove from the user or from the current Git project
-                                   (default: $PA2_SKILLS_SCOPE, else user)
-  --harness <harnesses>|all        comma-separated harnesses: claude, codex, opencode; all selects every one
-                                   (default: $PA2_SKILLS_HARNESS; required when it is unset)
-  --force                          also remove installations with local changes
-`,
-	},
-	{
-		name:    "update",
-		usage:   "update [--check] [--binary-only|--skills-only] [--conflict ask|overwrite|skip]",
-		summary: "Upgrade the binary, then synchronize the source checkout and every managed installation.",
-		details: `Flags:
-  --check                          report available updates without changing files
-  --binary-only                    only update the pa2-skills binary
-  --skills-only                    only update the source checkout and managed skills and rules
-  --conflict ask|overwrite|skip    how to resolve skills and rules with local and remote changes (default: ask)
-`,
-	},
-	{name: "list", usage: "list", summary: "List skills and rules available from the managed source checkout."},
-	{
-		name:    "status",
-		usage:   "status [name...]",
-		summary: "Show every managed installation and how it compares with the local source checkout.",
-		details: `Statuses:
-  current     matches the source checkout
-  outdated    the source checkout changed; run pa2-skills install or update to refresh it
-  modified    changed locally since pa2-skills last wrote it
-  diverged    changed both locally and in the source checkout
-  missing     the installed skill directory or rule block was deleted
-  orphaned    the skill or rule is no longer in the source checkout
-
-Run 'pa2-skills update --check' to see whether the remote source has changes.
-`,
-	},
-	{name: "discover", usage: "discover [path]", summary: "Report skills found below the current or supplied directory."},
-	{
-		name:    "add",
-		usage:   "add <skill-path> [--name <name>]",
-		summary: "Copy a local skill into the managed source checkout without Git operations.",
-		details: `Flags:
-  --name <name>    tracked skill name (default: the directory name)
-`,
-	},
-	{name: "version", usage: "version", summary: "Print the installed command version."},
-	{name: "source-path", usage: "source-path", summary: "Print the managed source checkout path."},
-	{name: "cd", usage: "cd [path]", summary: "Launch a child shell in the managed source checkout or one of its paths."},
-	{name: "completion", usage: "completion zsh", summary: "Print dynamic Zsh completion."},
-	{name: "doctor", usage: "doctor", summary: "Check the managed source checkout and local prerequisites."},
-	{name: "help", usage: "help [command]", summary: "Show usage for all commands or one command."},
-}
-
-const installFlagsHelp = `Flags:
-  --scope user|project             install for the user or for the current Git project
-                                   (default: $PA2_SKILLS_SCOPE, else user)
-  --harness <harnesses>|all        comma-separated harnesses: claude, codex, opencode; all selects every one
-                                   (default: $PA2_SKILLS_HARNESS; required when it is unset)
-  --conflict ask|overwrite|skip    how to resolve local changes (default: ask)
-`
-
-func lookupCommand(name string) (commandHelp, bool) {
-	if name == "--version" {
-		name = "version"
-	}
-	for _, help := range commandHelps {
-		if help.name == name {
-			return help, true
-		}
-	}
-	return commandHelp{}, false
-}
-
-func printUsage(writer io.Writer) {
-	fmt.Fprintln(writer, "Usage:")
-	for _, help := range commandHelps {
-		fmt.Fprintf(writer, "  pa2-skills %s\n", help.usage)
-	}
-	fmt.Fprintln(writer, "\nRun 'pa2-skills help <command>' for details.")
-}
-
-func printCommandHelp(writer io.Writer, help commandHelp) {
-	fmt.Fprintf(writer, "Usage: pa2-skills %s\n\n%s\n", help.usage, help.summary)
-	if help.details != "" {
-		fmt.Fprintf(writer, "\n%s", help.details)
-	}
-}
-
-const zshCompletion = `#compdef pa2-skills
-
-_pa2_skills() {
-  local command
-  local -a commands names harnesses scopes conflicts
-  commands=(
-    'install:install or refresh a skill or rule'
-    'sync:fetch the source repository and refresh a skill or rule'
-    'remove:delete managed skill and rule installations'
-    'update:update the binary, source, and managed skills and rules'
-    'version:print the installed command version'
-    'list:list available skills and rules'
-    'status:show managed installations'
-    'discover:find skills below a directory'
-    'add:copy a skill into the managed source checkout'
-    'source-path:print the managed source checkout'
-    'cd:open a shell in the managed source checkout'
-    'completion:generate shell completion'
-    'doctor:check the local installation'
-    'help:show usage for a command'
-  )
-  harnesses=(all claude codex opencode)
-  scopes=(user project)
-  conflicts=(ask overwrite skip)
-  command=$words[2]
-  if (( CURRENT > 2 )); then
-    words=($words[1] "${words[3,-1]}")
-    (( CURRENT-- ))
-  fi
-  case $command in
-    install|sync)
-      _arguments -s \
-        '--scope=[installation scope]:scope:->scope' \
-        '--harness=[comma-separated harnesses, or all]:harness:->harness' \
-        '--conflict=[conflict policy]:policy:->conflict' \
-        '*:name:->name'
-      case $state in
-        scope) _values 'scope' $scopes ;;
-        harness) _values -s , 'harness' $harnesses ;;
-        conflict) _values 'conflict policy' $conflicts ;;
-        name) names=(all "${(@f)$($words[1] completion values 2>/dev/null)}"); _describe -t names name names ;;
-      esac
-      ;;
-    remove)
-      _arguments -s \
-        '--scope=[installation scope]:scope:->scope' \
-        '--harness=[comma-separated harnesses, or all]:harness:->harness' \
-        '--force[also remove installations with local changes]' \
-        '*:name:->name'
-      case $state in
-        scope) _values 'scope' $scopes ;;
-        harness) _values -s , 'harness' $harnesses ;;
-        name) names=(all "${(@f)$($words[1] completion values 2>/dev/null)}"); _describe -t names name names ;;
-      esac
-      ;;
-    update)
-      _arguments -s \
-        '--check[report available updates without changing files]' \
-        '--binary-only[only update the pa2-skills binary]' \
-        '--skills-only[only update source and managed skills and rules]' \
-        '--conflict=[conflict policy]:policy:->conflict'
-      case $state in
-        conflict) _values 'conflict policy' $conflicts ;;
-      esac
-      ;;
-    status)
-      names=("${(@f)$($words[1] completion values 2>/dev/null)}"); _describe -t names name names
-      ;;
-    discover)
-      _files -/
-      ;;
-    add)
-      _arguments -s \
-        '--name=[tracked skill name]:name:' \
-        '1:skill directory:_files -/'
-      ;;
-    completion)
-      _values 'format' zsh values
-      ;;
-    help)
-      _describe -t commands command commands
-      ;;
-    cd)
-      _files -/
-      ;;
-    *)
-      _describe -t commands command commands
-      ;;
-  esac
-}
-
-compdef _pa2_skills pa2-skills
-`
